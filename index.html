@@ -369,15 +369,23 @@
 <div class="modal-backdrop" id="settingsBackdrop">
   <div class="modal">
     <h2>⚙ 設定</h2>
-    <div class="section-label" style="border-top:none;padding-top:4px">楽天API連携</div>
+    <div class="section-label" style="border-top:none;padding-top:4px">楽天API連携（2026年新API対応）</div>
     <div class="help-text">
       楽天市場APIを使うと、シールの<b>商品画像・参考価格・販売店</b>を自動で取り込めます。
       <a href="https://webservice.rakuten.co.jp/" target="_blank" rel="noopener">楽天ウェブサービス ↗</a>
-      で無料のアプリIDを発行し、下に貼り付けてください（このブラウザ内にのみ保存されます）。
+      でアプリを登録し、次の3つを確認してください（値はこのブラウザ内にのみ保存されます）。<br>
+      ① <b>アプリID</b>（英数字とハイフンのUUID形式）<br>
+      ② <b>アクセスキー</b>（pk_ で始まる値）<br>
+      ③ アプリ設定の<b>「アプリケーションURL（許可されたWebサイト）」に
+      <code id="originHint"></code> を登録</b>（未登録だと403エラーになります）
     </div>
     <div class="form-row">
-      <label>楽天アプリID（applicationId・数字のみ）</label>
-      <input type="text" id="fAppId" placeholder="例: 1000000000000000000" autocomplete="off">
+      <label>楽天アプリID（applicationId・UUID形式）</label>
+      <input type="text" id="fAppId" placeholder="例: 2fc160ec-26f2-4a04-888f-4b6eb504b0e6" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <label>アクセスキー（accessKey・pk_で始まる値）</label>
+      <input type="text" id="fAccessKey" placeholder="例: pk_XXXXXXXXXXXXXXXX" autocomplete="off">
     </div>
     <button class="btn" id="btnTestApi">接続テスト</button>
     <div class="rk-status" id="testStatus"></div>
@@ -385,7 +393,7 @@
     <div class="section-label">画像の一括取得</div>
     <div class="help-text">
       写真・画像URLが未設定のテーマをまとめて楽天で検索し、最初に見つかった商品画像と参考価格を登録します
-      （API制限のため1件ずつ約1秒かけて取得します。違う商品が入った場合は各シールの詳細画面で取り直せます）。
+      （API制限のため1件ずつ約2秒かけて取得します。違う商品が入った場合は各シールの詳細画面で取り直せます）。
     </div>
     <button class="btn primary" id="btnBulk">未設定テーマの画像を一括取得</button>
     <div class="rk-status" id="bulkStatus"></div>
@@ -551,53 +559,65 @@ function coverSvg(i) {
 }
 
 /* ============================================================
- * 楽天市場API（商品検索）
- * JSONP方式なのでfile://で開いてもそのまま動きます。
+ * 楽天市場API（商品検索・2026年新API対応）
+ * 新APIはアプリID（UUID形式）とアクセスキー（pk_〜）の両方が必須。
+ * 呼び出し元サイトの登録チェックがあるため、GitHub Pages等の
+ * Webサーバー上で開いた状態でのみ動作します（file://不可）。
  * ============================================================ */
-let jsonpSeq = 0;
-function jsonp(url) {
-  return new Promise((resolve, reject) => {
-    const cb = "__rkcb" + (++jsonpSeq);
-    const sc = document.createElement("script");
-    const timer = setTimeout(() => fail(new Error("タイムアウトしました")), 15000);
-    function cleanup() { clearTimeout(timer); delete window[cb]; sc.remove(); }
-    function fail(e) { cleanup(); reject(e); }
-    window[cb] = data => { cleanup(); resolve(data); };
-    sc.onerror = () => fail(new Error("通信に失敗しました"));
-    sc.src = url + "&callback=" + cb;
-    document.head.appendChild(sc);
-  });
+// 全角英数字や前後の空白の混入をここで吸収する
+function normalizeKey(v) {
+  return String(v || "").normalize("NFKC").trim();
 }
 
-// アプリIDは数字のみ。全角数字・空白・記号の混入をここで吸収する
-function normalizeAppId(v) {
-  return String(v || "")
-    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    .replace(/\D/g, "");
+function siteOrigin() {
+  return location.origin && location.origin.startsWith("http")
+    ? location.origin : "（このアプリをWebサーバー上で開いてください）";
 }
 
 async function rakutenSearch(keyword) {
-  const appId = normalizeAppId(state.settings.rakutenAppId);
-  if (!appId) throw new Error("NO_APP_ID");
-  const url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601" +
+  const appId = normalizeKey(state.settings.rakutenAppId);
+  const accessKey = normalizeKey(state.settings.rakutenAccessKey);
+  if (!appId || !accessKey) throw new Error("NO_APP_ID");
+  const url = "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401" +
     "?applicationId=" + encodeURIComponent(appId) +
+    "&accessKey=" + encodeURIComponent(accessKey) +
     "&keyword=" + encodeURIComponent(keyword) +
     "&hits=8&imageFlag=1&formatVersion=2&format=json";
-  const res = await jsonp(url);
-  if (res.error) {
-    const desc = res.error_description || res.error;
-    if (res.error === "wrong_parameter" && /applicationId/i.test(desc)) {
-      throw new Error("アプリIDが正しくありません。楽天ウェブサービスの管理画面で「アプリID」（数字のみの値）を確認してください。発行直後は使えるまで数分かかることがあります。（API応答: " + desc + "）");
-    }
-    throw new Error(desc);
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (e) {
+    throw new Error("楽天APIに接続できませんでした。楽天アプリ設定の「許可されたWebサイト（アプリケーションURL）」に " +
+      siteOrigin() + " が登録されているか確認してください。");
   }
-  return (res.Items || []).map(it => ({
-    name: it.itemName,
-    price: it.itemPrice,
-    shop: it.shopName,
-    url: it.itemUrl,
-    image: imgBig((it.mediumImageUrls || [])[0] || ""),
-  })).filter(it => it.image);
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* 本文なし */ }
+  if (!res.ok) {
+    const desc = (data && (data.error_description || data.error)) || "";
+    const tail = desc ? "（API応答: " + desc + "）" : "";
+    if (res.status === 403) {
+      throw new Error("アクセスが拒否されました(403)。楽天アプリ設定の「許可されたWebサイト（アプリケーションURL）」に " +
+        siteOrigin() + " を、「許可されたIPアドレス」に現在お使いの回線のIPを登録してください。" + tail);
+    }
+    if (res.status === 400 || res.status === 401) {
+      throw new Error("アプリIDまたはアクセスキーが正しくありません(" + res.status + ")。管理画面の「アプリID」（英数字のUUID形式）と「アクセスキー」（pk_で始まる値）を確認してください。" + tail);
+    }
+    if (res.status === 429) {
+      throw new Error("リクエストが多すぎます(429)。1分ほど待ってからもう一度お試しください。");
+    }
+    throw new Error("楽天APIエラー(" + res.status + ")。" + tail);
+  }
+  return ((data && data.Items) || []).map(raw => {
+    const it = raw.Item || raw; // formatVersion 1/2 両対応
+    const img0 = (it.mediumImageUrls || [])[0];
+    return {
+      name: it.itemName,
+      price: it.itemPrice,
+      shop: it.shopName,
+      url: it.itemUrl,
+      image: imgBig(typeof img0 === "string" ? img0 : (img0 && img0.imageUrl) || ""),
+    };
+  }).filter(it => it.image && it.name);
 }
 
 function imgBig(url) { return url.replace(/_ex=\d+x\d+/, "_ex=400x400"); }
@@ -806,7 +826,7 @@ async function fetchRakutenCandidates() {
     box._results = results;
   } catch (e) {
     if (e.message === "NO_APP_ID") {
-      status.textContent = "楽天アプリIDが未設定です。「⚙ 設定」から登録してください。";
+      status.textContent = "楽天アプリID・アクセスキーが未設定です。「⚙ 設定」から登録してください。";
       openSettings();
     } else {
       status.textContent = "取得できませんでした: " + e.message;
@@ -935,21 +955,29 @@ let bulkRunning = false;
 
 function openSettings() {
   document.getElementById("fAppId").value = state.settings.rakutenAppId || "";
+  document.getElementById("fAccessKey").value = state.settings.rakutenAccessKey || "";
+  document.getElementById("originHint").textContent = siteOrigin();
   settingsBackdrop.classList.add("open");
 }
 function closeSettings() { if (!bulkRunning) settingsBackdrop.classList.remove("open"); }
-function saveSettings() {
-  state.settings.rakutenAppId = normalizeAppId(document.getElementById("fAppId").value);
+function readSettingsForm() {
+  state.settings.rakutenAppId = normalizeKey(document.getElementById("fAppId").value);
+  state.settings.rakutenAccessKey = normalizeKey(document.getElementById("fAccessKey").value);
   save();
+}
+function saveSettings() {
+  readSettingsForm();
   closeSettings();
 }
 
 async function testApi() {
   const status = document.getElementById("testStatus");
-  state.settings.rakutenAppId = normalizeAppId(document.getElementById("fAppId").value);
-  save();
+  readSettingsForm();
   document.getElementById("fAppId").value = state.settings.rakutenAppId;
-  if (!state.settings.rakutenAppId) { status.textContent = "アプリIDを入力してください。"; return; }
+  document.getElementById("fAccessKey").value = state.settings.rakutenAccessKey;
+  if (!state.settings.rakutenAppId || !state.settings.rakutenAccessKey) {
+    status.textContent = "アプリIDとアクセスキーの両方を入力してください。"; return;
+  }
   status.textContent = "接続テスト中…";
   try {
     const results = await rakutenSearch("大人の図鑑シール");
@@ -962,10 +990,11 @@ async function testApi() {
 async function bulkFetch() {
   if (bulkRunning) { bulkRunning = false; return; }
   const status = document.getElementById("bulkStatus");
-  // フォームのIDを未保存でも使えるよう先に反映
-  state.settings.rakutenAppId = normalizeAppId(document.getElementById("fAppId").value);
-  save();
-  if (!state.settings.rakutenAppId) { status.textContent = "先に楽天アプリIDを入力してください。"; return; }
+  // フォームの値を未保存でも使えるよう先に反映
+  readSettingsForm();
+  if (!state.settings.rakutenAppId || !state.settings.rakutenAccessKey) {
+    status.textContent = "先に楽天アプリIDとアクセスキーを入力してください。"; return;
+  }
 
   const targets = state.items.filter(i => !i.photo && !i.imageUrl);
   if (!targets.length) { status.textContent = "画像が未設定のテーマはありません。"; return; }
@@ -993,8 +1022,8 @@ async function bulkFetch() {
       break;
     }
     save(); render();
-    // 楽天APIのレート制限（1リクエスト/秒）を守る
-    await new Promise(r => setTimeout(r, 1100));
+    // 新APIのレート制限対策（間隔が短いと429が返る）
+    await new Promise(r => setTimeout(r, 1700));
   }
   if (bulkRunning || ok + ng > 0) {
     document.getElementById("bulkStatus").textContent =
