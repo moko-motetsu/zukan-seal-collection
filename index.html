@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大人の図鑑シール コレクション</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --hairline: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --accent-weak: #cde2fb;
+    --good: #006300;
+    --owned-badge: #0ca30c;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --hairline: #2c2c2a;
+      --border: rgba(255,255,255,0.10);
+      --accent: #3987e5;
+      --accent-weak: #184f95;
+      --good: #0ca30c;
+      --owned-badge: #0ca30c;
+      --card-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+  .container { max-width: 1080px; margin: 0 auto; padding: 16px; }
+
+  header.app-header {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    padding: 8px 0 16px;
+  }
+  header.app-header h1 { font-size: 22px; font-weight: 700; }
+  header.app-header .sub { font-size: 13px; color: var(--text-muted); }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ---- stats ---- */
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+  }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; box-shadow: var(--card-shadow);
+  }
+  .tile .label { font-size: 12px; color: var(--text-secondary); }
+  .tile .value { font-size: 28px; font-weight: 700; }
+  .tile .value small { font-size: 14px; font-weight: 400; color: var(--text-secondary); }
+  .tile.hero .value { color: var(--accent); }
+
+  .progress-track {
+    height: 8px; border-radius: 4px; background: var(--hairline);
+    overflow: hidden; margin-top: 8px;
+  }
+  .progress-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .3s; }
+
+  /* ---- category progress ---- */
+  .cat-progress {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; box-shadow: var(--card-shadow);
+  }
+  .cat-progress h2 { font-size: 14px; color: var(--text-secondary); font-weight: 600; margin-bottom: 10px; }
+  .cat-row { display: grid; grid-template-columns: 9em 1fr 5.5em; gap: 10px; align-items: center; margin-bottom: 8px; font-size: 13px; }
+  .cat-row .cat-name { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-row .cat-num { color: var(--text-secondary); text-align: right; font-variant-numeric: tabular-nums; }
+  .cat-row .progress-track { margin-top: 0; }
+
+  /* ---- filters ---- */
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .filters input[type="search"] {
+    flex: 1 1 200px; padding: 8px 12px; border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--surface-1); color: var(--text-primary); font-size: 14px;
+  }
+  .filters select {
+    padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--surface-1); color: var(--text-primary); font-size: 14px;
+  }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chip {
+    padding: 5px 12px; border-radius: 999px; border: 1px solid var(--hairline);
+    background: var(--surface-1); color: var(--text-secondary); font-size: 13px; cursor: pointer;
+  }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ---- SNS bar ---- */
+  .sns-bar {
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 14px; font-size: 12px; color: var(--text-secondary);
+  }
+  .sns-bar a {
+    font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--hairline);
+    color: var(--accent); text-decoration: none; background: var(--surface-1);
+  }
+
+  /* ---- grid ---- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; cursor: pointer; box-shadow: var(--card-shadow);
+    display: flex; flex-direction: column; position: relative;
+    transition: transform .1s;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .card.not-owned { opacity: .62; }
+  .card .thumb {
+    height: 110px; display: flex; align-items: center; justify-content: center;
+    font-size: 48px; background: var(--page); border-bottom: 1px solid var(--hairline);
+  }
+  .card .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .card .body { padding: 10px 12px 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .card .name { font-size: 14px; font-weight: 600; }
+  .card .cat { font-size: 11px; color: var(--text-muted); }
+  .card .meta { font-size: 11px; color: var(--text-secondary); margin-top: auto; }
+  .badge {
+    position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px; color: #fff; background: var(--owned-badge);
+  }
+  .badge.want { background: var(--text-muted); }
+  .own-toggle {
+    position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-muted);
+    font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .own-toggle.on { background: var(--owned-badge); border-color: var(--owned-badge); color: #fff; }
+
+  .empty { text-align: center; color: var(--text-muted); padding: 40px 0; }
+
+  /* ---- buttons ---- */
+  .btn {
+    padding: 8px 14px; border-radius: 8px; border: 1px solid var(--hairline);
+    background: var(--surface-1); color: var(--text-primary); font-size: 13px; cursor: pointer;
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.danger { color: #d03b3b; border-color: #d03b3b; background: transparent; }
+
+  /* ---- modal ---- */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: none; align-items: flex-start; justify-content: center; padding: 24px 12px; z-index: 100;
+    overflow-y: auto;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface-1); border-radius: 14px; max-width: 520px; width: 100%;
+    padding: 20px; border: 1px solid var(--border);
+  }
+  .modal h2 { font-size: 18px; margin-bottom: 4px; }
+  .modal .modal-cat { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+  .modal .photo-area {
+    height: 180px; border-radius: 10px; background: var(--page); border: 1px dashed var(--hairline);
+    display: flex; align-items: center; justify-content: center; font-size: 64px; margin-bottom: 12px;
+    overflow: hidden; cursor: pointer; position: relative;
+  }
+  .modal .photo-area img { width: 100%; height: 100%; object-fit: contain; }
+  .modal .photo-hint {
+    position: absolute; bottom: 6px; right: 10px; font-size: 11px; color: var(--text-muted);
+    background: var(--surface-1); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--hairline);
+  }
+  .form-row { margin-bottom: 10px; }
+  .form-row label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 3px; }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--page); color: var(--text-primary); font-size: 14px; font-family: inherit;
+  }
+  .form-row textarea { resize: vertical; min-height: 56px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .owned-switch {
+    display: flex; gap: 8px; margin-bottom: 12px;
+  }
+  .owned-switch button {
+    flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--hairline);
+    background: var(--page); color: var(--text-secondary); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .owned-switch button.sel-owned { background: var(--owned-badge); border-color: var(--owned-badge); color: #fff; }
+  .owned-switch button.sel-want { background: var(--text-muted); border-color: var(--text-muted); color: #fff; }
+  .shop-links { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 14px; }
+  .shop-links a {
+    font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--hairline);
+    color: var(--accent); text-decoration: none; background: var(--page);
+  }
+
+  /* ---- 楽天API 取得結果 ---- */
+  .market-info { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+  .market-info a { color: var(--accent); }
+  .rk-status { font-size: 12px; color: var(--text-muted); margin: 6px 0; }
+  .rk-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 8px; }
+  .rk-item {
+    border: 1px solid var(--hairline); border-radius: 8px; overflow: hidden; cursor: pointer;
+    background: var(--page); text-align: center;
+  }
+  .rk-item:hover { border-color: var(--accent); }
+  .rk-item img { width: 100%; height: 90px; object-fit: contain; background: #fff; }
+  .rk-item .rk-name {
+    font-size: 10px; color: var(--text-secondary); padding: 2px 6px 0;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .rk-item .rk-price { font-size: 12px; font-weight: 700; padding: 0 6px 6px; }
+  .help-text { font-size: 12px; color: var(--text-muted); margin: 6px 0 10px; line-height: 1.6; }
+  .help-text a { color: var(--accent); }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; flex-wrap: wrap; }
+  .section-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 14px 0 8px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+
+  footer { text-align: center; font-size: 11px; color: var(--text-muted); padding: 24px 0 16px; }
+  footer a { color: var(--text-muted); }
+
+  @media (max-width: 560px) {
+    .cat-row { grid-template-columns: 7em 1fr 5em; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="app-header">
+    <h1>📔 大人の図鑑シール コレクション</h1>
+    <span class="sub">カミオジャパン「大人の図鑑」シールシリーズ管理帳</span>
+    <div class="header-actions">
+      <button class="btn" id="btnSettings">⚙ 設定</button>
+      <button class="btn" id="btnExport">書き出し</button>
+      <button class="btn" id="btnImport">読み込み</button>
+      <button class="btn primary" id="btnAdd">＋ 追加</button>
+    </div>
+  </header>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="cat-progress">
+    <h2>カテゴリ別コンプリート状況</h2>
+    <div id="catProgress"></div>
+  </section>
+
+  <div class="filters">
+    <input type="search" id="search" placeholder="シール名で検索…">
+    <select id="ownFilter">
+      <option value="all">すべて</option>
+      <option value="owned">持ってる</option>
+      <option value="want">未入手</option>
+    </select>
+    <select id="sortSel">
+      <option value="catalog">図鑑順</option>
+      <option value="name">名前順</option>
+      <option value="recent">購入日が新しい順</option>
+      <option value="price">購入価格順</option>
+    </select>
+  </div>
+  <div class="chips" id="catChips"></div>
+
+  <div class="sns-bar">
+    <span>📣 新作・購入情報:</span>
+    <a href="https://x.com/search?q=%E5%A4%A7%E4%BA%BA%E3%81%AE%E5%9B%B3%E9%91%91%E3%82%B7%E3%83%BC%E3%83%AB&f=live" target="_blank" rel="noopener">X（旧Twitter）↗</a>
+    <a href="https://www.instagram.com/explore/search/keyword/?q=%23%E5%A4%A7%E4%BA%BA%E3%81%AE%E5%9B%B3%E9%91%91%E3%82%B7%E3%83%BC%E3%83%AB" target="_blank" rel="noopener">Instagram ↗</a>
+    <a href="https://jp.mercari.com/search?keyword=%E5%A4%A7%E4%BA%BA%E3%81%AE%E5%9B%B3%E9%91%91%E3%82%B7%E3%83%BC%E3%83%AB" target="_blank" rel="noopener">メルカリ ↗</a>
+    <a href="https://kamiojapan.jp/news/" target="_blank" rel="noopener">公式ニュース ↗</a>
+  </div>
+
+  <section class="grid" id="grid"></section>
+  <div class="empty" id="empty" style="display:none">該当するシールがありません</div>
+
+  <footer>
+    商品画像・参考価格は楽天市場APIまたは各自登録の写真によるものです。
+    <a href="https://webservice.rakuten.co.jp/" target="_blank" rel="noopener">Supported by Rakuten Developers</a><br>
+    収録リストは編集・追加できます。データはこのブラウザ内（localStorage）に保存されます。
+  </footer>
+</div>
+
+<!-- 詳細・編集モーダル -->
+<div class="modal-backdrop" id="detailBackdrop">
+  <div class="modal">
+    <h2 id="mName"></h2>
+    <div class="modal-cat" id="mCat"></div>
+    <div class="photo-area" id="mPhoto" title="クリックで写真を登録">
+      <span class="photo-hint">📷 タップして写真を登録</span>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" style="display:none">
+
+    <div class="owned-switch">
+      <button id="swOwned">✓ 持ってる</button>
+      <button id="swWant">未入手</button>
+    </div>
+
+    <div id="purchaseSection">
+      <div class="section-label">購入情報</div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>購入日</label>
+          <input type="date" id="fDate">
+        </div>
+        <div class="form-row">
+          <label>価格（円・税込）</label>
+          <input type="number" id="fPrice" min="0" placeholder="例: 275">
+        </div>
+        <div class="form-row">
+          <label>購入店</label>
+          <input type="text" id="fStore" list="storeList" placeholder="例: ロフト / ハンズ / 文具店">
+          <datalist id="storeList"></datalist>
+        </div>
+        <div class="form-row">
+          <label>枚数（ダブり含む）</label>
+          <input type="number" id="fCount" min="1" value="1">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>メモ</label>
+        <textarea id="fMemo" placeholder="金箔押しがきれい、◯◯店の限定 など"></textarea>
+      </div>
+    </div>
+
+    <div class="section-label">楽天市場から画像・購入情報を取得</div>
+    <div class="market-info" id="marketInfo"></div>
+    <button class="btn" id="btnRakuten">🔍 楽天で商品を検索して取り込む</button>
+    <div class="rk-status" id="rkStatus"></div>
+    <div class="rk-results" id="rkResults"></div>
+
+    <div class="section-label">SNSで購入情報をチェック</div>
+    <div class="shop-links" id="snsLinks"></div>
+
+    <div class="section-label">通販で探す</div>
+    <div class="shop-links" id="shopLinks"></div>
+
+    <div class="section-label">図鑑情報を編集</div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>シール名</label>
+        <input type="text" id="fName">
+      </div>
+      <div class="form-row">
+        <label>カテゴリ</label>
+        <select id="fCategory"></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>内容・説明</label>
+      <textarea id="fDesc"></textarea>
+    </div>
+    <div class="form-row">
+      <label>商品画像URL（通販サイト等の画像アドレスを貼り付け）</label>
+      <input type="url" id="fImageUrl" placeholder="https://…（画像を長押し/右クリック→画像アドレスをコピー）">
+      <div class="shop-links" style="margin-top:6px" id="imgSearchLinks"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn danger" id="btnDelete">削除</button>
+      <button class="btn" id="btnCancel">閉じる</button>
+      <button class="btn primary" id="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 設定モーダル -->
+<div class="modal-backdrop" id="settingsBackdrop">
+  <div class="modal">
+    <h2>⚙ 設定</h2>
+    <div class="section-label" style="border-top:none;padding-top:4px">楽天API連携</div>
+    <div class="help-text">
+      楽天市場APIを使うと、シールの<b>商品画像・参考価格・販売店</b>を自動で取り込めます。
+      <a href="https://webservice.rakuten.co.jp/" target="_blank" rel="noopener">楽天ウェブサービス ↗</a>
+      で無料のアプリIDを発行し、下に貼り付けてください（このブラウザ内にのみ保存されます）。
+    </div>
+    <div class="form-row">
+      <label>楽天アプリID（applicationId）</label>
+      <input type="text" id="fAppId" placeholder="例: 1000000000000000000" autocomplete="off">
+    </div>
+
+    <div class="section-label">画像の一括取得</div>
+    <div class="help-text">
+      写真・画像URLが未設定のテーマをまとめて楽天で検索し、最初に見つかった商品画像と参考価格を登録します
+      （API制限のため1件ずつ約1秒かけて取得します。違う商品が入った場合は各シールの詳細画面で取り直せます）。
+    </div>
+    <button class="btn primary" id="btnBulk">未設定テーマの画像を一括取得</button>
+    <div class="rk-status" id="bulkStatus"></div>
+
+    <div class="modal-actions">
+      <button class="btn" id="btnSettingsClose">閉じる</button>
+      <button class="btn primary" id="btnSettingsSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+ * 収録カタログ（初期データ）
+ * カミオジャパン「大人の図鑑シール」シリーズのテーマ一覧。
+ * 新作は随時発売されるため、アプリ内の「＋追加」から登録できます。
+ * ============================================================ */
+const CATEGORIES = [
+  "生き物（陸）", "海・水の生き物", "鳥", "植物・きのこ",
+  "自然・科学", "食べ物", "飲み物", "乗り物・建物", "その他"
+];
+
+const SEED = [
+  // --- 生き物（陸） ---
+  s("動物園",            "生き物（陸）", "🦁", "ライオン・ゾウ・キリンなど動物園の人気者を図鑑風に収録"),
+  s("パンダ",            "生き物（陸）", "🐼", "ジャイアントパンダの仕草・生態をあつめた一枚"),
+  s("日本猫",            "生き物（陸）", "🐈", "三毛・キジトラなど日本の猫の毛色・種類"),
+  s("猫（長毛種）",      "生き物（陸）", "🐈‍⬛", "ペルシャ・メインクーンなど長毛種の猫"),
+  s("昆虫",              "生き物（陸）", "🪲", "カブトムシ・クワガタ・チョウなど昆虫の世界"),
+  s("爬虫類",            "生き物（陸）", "🦎", "ヤモリ・ヘビ・トカゲなど爬虫類たち"),
+  s("カエル",            "生き物（陸）", "🐸", "国内外のカエルの種類をあつめた一枚"),
+  s("恐竜",              "生き物（陸）", "🦖", "ティラノサウルスをはじめ古代の恐竜たち"),
+  // --- 海・水の生き物 ---
+  s("海の生き物",        "海・水の生き物", "🐬", "イルカ・ウミガメなど海の人気者たち"),
+  s("深海魚",            "海・水の生き物", "🐟", "チョウチンアンコウなど深海の不思議な生き物"),
+  s("クラゲ",            "海・水の生き物", "🪼", "ゆらゆら漂うクラゲの種類いろいろ"),
+  s("金魚",              "海・水の生き物", "🐠", "琉金・出目金など観賞魚の代表・金魚"),
+  s("ペンギン",          "海・水の生き物", "🐧", "世界のペンギンの種類と生態"),
+  // --- 鳥 ---
+  s("フクロウ",          "鳥", "🦉", "フクロウ・ミミズクの仲間たち"),
+  s("文鳥",              "鳥", "🐦", "白文鳥・桜文鳥などかわいい文鳥"),
+  s("インコ",            "鳥", "🦜", "セキセイインコなど人気の飼い鳥"),
+  // --- 植物・きのこ ---
+  s("多肉植物",          "植物・きのこ", "🌵", "エケベリア・ハオルチアなど多肉植物"),
+  s("きのこ",            "植物・きのこ", "🍄", "食用から毒きのこまで、きのこの世界"),
+  s("植物",              "植物・きのこ", "🌿", "身近な草花・植物をあつめた一枚"),
+  // --- 自然・科学 ---
+  s("鉱物",              "自然・科学", "💎", "水晶・蛍石など美しい鉱物標本。シリーズ第1弾（2017年〜）の代表作"),
+  s("鉱物2",             "自然・科学", "🔮", "人気の鉱物テーマ第2弾"),
+  s("宇宙",              "自然・科学", "🪐", "惑星・銀河・星雲など宇宙の神秘"),
+  s("天気",              "自然・科学", "⛅", "雲の種類や気象現象をあつめた一枚"),
+  s("化石",              "自然・科学", "🦴", "アンモナイトなど太古のロマン・化石"),
+  // --- 食べ物 ---
+  s("寿司",              "食べ物", "🍣", "にぎり寿司のネタをずらり図鑑風に"),
+  s("和菓子",            "食べ物", "🍡", "練り切り・大福など季節の和菓子"),
+  s("パン",              "食べ物", "🥐", "食パンから菓子パンまでパンいろいろ"),
+  s("うどん",            "食べ物", "🍜", "きつね・天ぷらなど全国のうどん"),
+  s("カレー",            "食べ物", "🍛", "カツカレーから欧風までカレーの世界"),
+  s("町中華",            "食べ物", "🥟", "チャーハン・餃子など町中華の定番メニュー"),
+  s("韓国料理",          "食べ物", "🌶️", "キンパ・トッポギなど人気の韓国グルメ"),
+  s("焼肉",              "食べ物", "🥩", "カルビ・ハラミなど焼肉の部位図鑑"),
+  s("屋台",              "食べ物", "🏮", "たこ焼き・りんご飴など縁日屋台グルメ"),
+  s("ファミレス",        "食べ物", "🍽️", "ハンバーグ・ドリアなどファミレスの定番"),
+  s("居酒屋",            "食べ物", "🍢", "串焼き・おつまみなど居酒屋メニュー"),
+  s("どんぶり",          "食べ物", "🍚", "牛丼・親子丼などどんぶり飯の数々"),
+  s("日本料理",          "食べ物", "🍱", "会席・和食の美しい日本料理"),
+  s("卵料理",            "食べ物", "🍳", "オムライス・だし巻きなど卵料理づくし"),
+  s("麺類",              "食べ物", "🍝", "ラーメン・パスタなど麺類大集合"),
+  s("飯テロ",            "食べ物", "🤤", "深夜に見てはいけない飯テロ飯"),
+  s("お弁当",            "食べ物", "🍙", "彩り豊かなお弁当のおかずたち"),
+  s("スイーツ",          "食べ物", "🍰", "ケーキ・パフェなど洋菓子スイーツ"),
+  s("スーパー",          "食べ物", "🛒", "スーパーマーケットでおなじみの品々"),
+  s("お米",              "食べ物", "🌾", "銘柄米やごはんのおともの世界"),
+  s("世界のお菓子",      "食べ物", "🍬", "各国の伝統菓子・スイーツをあつめて"),
+  // --- 飲み物 ---
+  s("カクテル",          "飲み物", "🍸", "定番カクテルをレシピ付き図鑑風に"),
+  s("カクテル2",         "飲み物", "🍹", "人気のカクテルテーマ第2弾"),
+  s("ジュース",          "飲み物", "🧃", "懐かしのジュース・ドリンクいろいろ"),
+  s("お茶とコーヒー",    "飲み物", "☕", "茶葉とコーヒーの奥深い世界"),
+  s("レトロ喫茶",        "飲み物", "🫖", "クリームソーダなど純喫茶メニュー"),
+  // --- 乗り物・建物 ---
+  s("乗り物",            "乗り物・建物", "🚃", "電車・バス・働く車など乗り物大集合"),
+  s("建築物",            "乗り物・建物", "🏛️", "世界と日本の名建築をあつめた一枚"),
+  s("世界遺産",          "乗り物・建物", "🗼", "世界遺産の名所を図鑑風に収録"),
+];
+
+function s(name, category, emoji, desc) {
+  return { id: "seed_" + name, name, category, emoji, desc };
+}
+
+/* ============================================================
+ * データ層（localStorage）
+ * ============================================================ */
+const STORE_KEY = "zukanSealCollection_v1";
+
+function load() {
+  let data;
+  try { data = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { data = null; }
+  if (!data || !Array.isArray(data.items)) data = { items: [] };
+  if (!data.settings || typeof data.settings !== "object") data.settings = {};
+  // シードにあってデータに無いテーマを追記（アプリ更新で新テーマが増えた場合）
+  const ids = new Set(data.items.map(i => i.id));
+  for (const seed of SEED) {
+    if (!ids.has(seed.id)) {
+      data.items.push({ ...seed, owned: false, count: 0, photo: null,
+        purchaseDate: "", price: null, store: "", memo: "" });
+    }
+  }
+  return data;
+}
+
+let state = load();
+let filter = { q: "", cat: "all", own: "all", sort: "catalog" };
+let editingId = null;
+let editingOwned = false;
+let editingPhoto = undefined; // undefined = 変更なし
+let pendingMarket = undefined; // undefined = 変更なし（楽天から取り込んだ購入情報）
+
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function item(id) { return state.items.find(i => i.id === id); }
+function yen(n) { return "¥" + Number(n).toLocaleString("ja-JP"); }
+function esc(str) {
+  return String(str ?? "").replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ============================================================
+ * 概要画像
+ * 優先順: 自分の写真 > 商品画像URL > 自動生成の図鑑風カバー
+ * ============================================================ */
+const COVER_TONES = {
+  "生き物（陸）":   ["#f5ead8", "#8a6d3b"],
+  "海・水の生き物": ["#dcebf5", "#3b6d8a"],
+  "鳥":             ["#e8f0dc", "#5f7a3b"],
+  "植物・きのこ":   ["#e2efdf", "#3b7a4a"],
+  "自然・科学":     ["#e6e2f2", "#54468a"],
+  "食べ物":         ["#f7e6d8", "#a05a2c"],
+  "飲み物":         ["#f2e2e8", "#8a3b5e"],
+  "乗り物・建物":   ["#e2e8ee", "#44586c"],
+  "その他":         ["#eeeade", "#6b6350"],
+};
+
+function coverSvg(i) {
+  const [bg, ink] = COVER_TONES[i.category] || COVER_TONES["その他"];
+  const emoji = i.emoji || "📔";
+  const name = String(i.name || "").slice(0, 10);
+  const svg =
+`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="170" viewBox="0 0 240 170">
+  <rect width="240" height="170" fill="${bg}"/>
+  <rect x="7" y="7" width="226" height="156" fill="none" stroke="#c9a227" stroke-width="2" rx="6"/>
+  <rect x="12" y="12" width="216" height="146" fill="none" stroke="${ink}" stroke-width="0.8" rx="4" opacity="0.5"/>
+  <text x="120" y="30" text-anchor="middle" font-family="serif" font-size="11" fill="${ink}" opacity="0.85">— 大人の図鑑 —</text>
+  <text x="120" y="96" text-anchor="middle" font-size="52">${emoji}</text>
+  <text x="26" y="70" text-anchor="middle" font-size="16" opacity="0.55">${emoji}</text>
+  <text x="214" y="70" text-anchor="middle" font-size="16" opacity="0.55">${emoji}</text>
+  <text x="26" y="130" text-anchor="middle" font-size="16" opacity="0.55">${emoji}</text>
+  <text x="214" y="130" text-anchor="middle" font-size="16" opacity="0.55">${emoji}</text>
+  <text x="120" y="148" text-anchor="middle" font-family="serif" font-size="15" font-weight="bold" fill="${ink}">${name}</text>
+</svg>`;
+  return "data:image/svg+xml," + encodeURIComponent(svg);
+}
+
+/* ============================================================
+ * 楽天市場API（商品検索）
+ * JSONP方式なのでfile://で開いてもそのまま動きます。
+ * ============================================================ */
+let jsonpSeq = 0;
+function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cb = "__rkcb" + (++jsonpSeq);
+    const sc = document.createElement("script");
+    const timer = setTimeout(() => fail(new Error("タイムアウトしました")), 15000);
+    function cleanup() { clearTimeout(timer); delete window[cb]; sc.remove(); }
+    function fail(e) { cleanup(); reject(e); }
+    window[cb] = data => { cleanup(); resolve(data); };
+    sc.onerror = () => fail(new Error("通信に失敗しました"));
+    sc.src = url + "&callback=" + cb;
+    document.head.appendChild(sc);
+  });
+}
+
+async function rakutenSearch(keyword) {
+  const appId = (state.settings.rakutenAppId || "").trim();
+  if (!appId) throw new Error("NO_APP_ID");
+  const url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601" +
+    "?applicationId=" + encodeURIComponent(appId) +
+    "&keyword=" + encodeURIComponent(keyword) +
+    "&hits=8&imageFlag=1&formatVersion=2&format=json";
+  const res = await jsonp(url);
+  if (res.error) {
+    throw new Error(res.error === "wrong_parameter" && /applicationId/.test(res.error_description || "")
+      ? "アプリIDが正しくありません" : (res.error_description || res.error));
+  }
+  return (res.Items || []).map(it => ({
+    name: it.itemName,
+    price: it.itemPrice,
+    shop: it.shopName,
+    url: it.itemUrl,
+    image: imgBig((it.mediumImageUrls || [])[0] || ""),
+  })).filter(it => it.image);
+}
+
+function imgBig(url) { return url.replace(/_ex=\d+x\d+/, "_ex=400x400"); }
+
+function marketLabel(m) {
+  return `参考 ${yen(m.price)}（${esc(m.shop)}）`;
+}
+
+function coverImgTag(i) {
+  if (i.photo) return `<img src="${i.photo}" alt="${esc(i.name)}">`;
+  if (i.imageUrl) {
+    // 通販サイトの画像を参照表示（読み込めない場合は図鑑風カバーに自動フォールバック）
+    return `<img src="${esc(i.imageUrl)}" alt="${esc(i.name)}" referrerpolicy="no-referrer" data-fallback-id="${esc(i.id)}">`;
+  }
+  return `<img src="${coverSvg(i)}" alt="${esc(i.name)}">`;
+}
+
+/* ============================================================
+ * 描画
+ * ============================================================ */
+function render() {
+  renderStats();
+  renderCatProgress();
+  renderChips();
+  renderGrid();
+}
+
+function renderStats() {
+  const total = state.items.length;
+  const owned = state.items.filter(i => i.owned).length;
+  const pct = total ? Math.round(owned / total * 100) : 0;
+  const spent = state.items.reduce((a, i) => a + (i.owned && i.price ? Number(i.price) : 0), 0);
+  document.getElementById("stats").innerHTML = `
+    <div class="tile hero">
+      <div class="label">コンプリート率</div>
+      <div class="value">${pct}<small>%</small></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="tile">
+      <div class="label">収録テーマ数</div>
+      <div class="value">${total}<small> 種</small></div>
+    </div>
+    <div class="tile">
+      <div class="label">持ってる</div>
+      <div class="value">${owned}<small> 種</small></div>
+    </div>
+    <div class="tile">
+      <div class="label">未入手</div>
+      <div class="value">${total - owned}<small> 種</small></div>
+    </div>
+    <div class="tile">
+      <div class="label">購入金額合計</div>
+      <div class="value" style="font-size:22px">${yen(spent)}</div>
+    </div>`;
+}
+
+function renderCatProgress() {
+  const el = document.getElementById("catProgress");
+  el.innerHTML = CATEGORIES.map(cat => {
+    const items = state.items.filter(i => i.category === cat);
+    if (!items.length) return "";
+    const owned = items.filter(i => i.owned).length;
+    const pct = Math.round(owned / items.length * 100);
+    return `
+      <div class="cat-row">
+        <span class="cat-name">${esc(cat)}</span>
+        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <span class="cat-num">${owned} / ${items.length}</span>
+      </div>`;
+  }).join("");
+}
+
+function renderChips() {
+  const el = document.getElementById("catChips");
+  const cats = ["all", ...CATEGORIES.filter(c => state.items.some(i => i.category === c))];
+  el.innerHTML = cats.map(c =>
+    `<button class="chip ${filter.cat === c ? "active" : ""}" data-cat="${esc(c)}">
+       ${c === "all" ? "すべて" : esc(c)}
+     </button>`).join("");
+}
+
+function visibleItems() {
+  let items = state.items.filter(i => {
+    if (filter.cat !== "all" && i.category !== filter.cat) return false;
+    if (filter.own === "owned" && !i.owned) return false;
+    if (filter.own === "want" && i.owned) return false;
+    if (filter.q && !i.name.toLowerCase().includes(filter.q) &&
+        !(i.desc || "").toLowerCase().includes(filter.q)) return false;
+    return true;
+  });
+  const by = filter.sort;
+  if (by === "name") items.sort((a, b) => a.name.localeCompare(b.name, "ja"));
+  else if (by === "recent") items.sort((a, b) => (b.purchaseDate || "").localeCompare(a.purchaseDate || ""));
+  else if (by === "price") items.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+  return items;
+}
+
+function renderGrid() {
+  const items = visibleItems();
+  const grid = document.getElementById("grid");
+  document.getElementById("empty").style.display = items.length ? "none" : "block";
+  grid.innerHTML = items.map(i => {
+    const thumb = coverImgTag(i);
+    const meta = i.owned
+      ? [i.purchaseDate, i.store, i.price != null && i.price !== "" ? yen(i.price) : ""]
+          .filter(Boolean).join("・")
+      : (i.market ? marketLabel(i.market) : "");
+    return `
+      <div class="card ${i.owned ? "" : "not-owned"}" data-id="${esc(i.id)}">
+        <div class="thumb">${thumb}</div>
+        <span class="badge ${i.owned ? "" : "want"}">${i.owned ? "持ってる" + (i.count > 1 ? " ×" + i.count : "") : "未入手"}</span>
+        <button class="own-toggle ${i.owned ? "on" : ""}" data-toggle="${esc(i.id)}" title="所持を切り替え">✓</button>
+        <div class="body">
+          <div class="name">${esc(i.name)}</div>
+          <div class="cat">${esc(i.category)}</div>
+          <div class="meta">${esc(meta)}</div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+/* ============================================================
+ * 詳細モーダル
+ * ============================================================ */
+const backdrop = document.getElementById("detailBackdrop");
+
+function openDetail(id) {
+  const i = id ? item(id) : null;
+  editingId = id;
+  editingOwned = i ? i.owned : false;
+  editingPhoto = undefined;
+  pendingMarket = undefined;
+  renderMarketInfo(i ? i.market : null);
+  document.getElementById("rkResults").innerHTML = "";
+  document.getElementById("rkStatus").textContent = "";
+
+  document.getElementById("mName").textContent = i ? i.name : "新しいシールを追加";
+  document.getElementById("mCat").textContent = i ? i.category : "";
+  document.getElementById("fName").value = i ? i.name : "";
+  document.getElementById("fDesc").value = i ? (i.desc || "") : "";
+  document.getElementById("fDate").value = i ? (i.purchaseDate || "") : "";
+  document.getElementById("fPrice").value = i && i.price != null ? i.price : "";
+  document.getElementById("fStore").value = i ? (i.store || "") : "";
+  document.getElementById("fCount").value = i && i.count ? i.count : 1;
+  document.getElementById("fMemo").value = i ? (i.memo || "") : "";
+  document.getElementById("fImageUrl").value = i ? (i.imageUrl || "") : "";
+  document.getElementById("btnDelete").style.display = id ? "" : "none";
+
+  const catSel = document.getElementById("fCategory");
+  catSel.innerHTML = CATEGORIES.map(c =>
+    `<option value="${esc(c)}" ${i && i.category === c ? "selected" : ""}>${esc(c)}</option>`).join("");
+
+  // 購入店の入力候補（過去に入力した店名）
+  const stores = [...new Set(state.items.map(x => x.store).filter(Boolean))];
+  document.getElementById("storeList").innerHTML =
+    stores.map(st => `<option value="${esc(st)}">`).join("");
+
+  renderPhotoArea(i);
+  renderOwnedSwitch();
+  renderShopLinks(i ? i.name : "");
+  backdrop.classList.add("open");
+}
+
+function renderPhotoArea(i) {
+  const el = document.getElementById("mPhoto");
+  const photo = editingPhoto !== undefined ? editingPhoto : (i ? i.photo : null);
+  let img;
+  if (photo) {
+    img = `<img src="${photo}" alt="">`;
+  } else if (i && i.imageUrl) {
+    img = `<img src="${esc(i.imageUrl)}" alt="" referrerpolicy="no-referrer" data-fallback-id="${esc(i.id)}">`;
+  } else if (i) {
+    img = `<img src="${coverSvg(i)}" alt="">`;
+  } else {
+    img = `<span>📔</span>`;
+  }
+  el.innerHTML = img +
+    `<span class="photo-hint">📷 タップして写真を${photo ? "変更" : "登録"}</span>`;
+}
+
+function renderMarketInfo(m) {
+  const el = document.getElementById("marketInfo");
+  el.innerHTML = m
+    ? `${marketLabel(m)} — <a href="${esc(m.url)}" target="_blank" rel="noopener">商品ページ ↗</a>
+       <span style="color:var(--text-muted)">（${esc(m.fetchedAt || "")}取得）</span>`
+    : `<span style="color:var(--text-muted)">未取得。ボタンを押すと楽天市場から候補を検索します。</span>`;
+}
+
+async function fetchRakutenCandidates() {
+  const status = document.getElementById("rkStatus");
+  const box = document.getElementById("rkResults");
+  const name = document.getElementById("fName").value.trim();
+  if (!name) { status.textContent = "先にシール名を入力してください"; return; }
+  box.innerHTML = "";
+  status.textContent = "検索中…";
+  try {
+    const results = await rakutenSearch("大人の図鑑シール " + name);
+    if (!results.length) { status.textContent = "見つかりませんでした（名前を変えて試してください）"; return; }
+    status.textContent = "使いたい商品をタップしてください:";
+    box.innerHTML = results.map((r, idx) => `
+      <div class="rk-item" data-rk="${idx}">
+        <img src="${esc(r.image)}" alt="" referrerpolicy="no-referrer">
+        <div class="rk-name">${esc(r.name)}</div>
+        <div class="rk-price">${yen(r.price)}</div>
+      </div>`).join("");
+    box._results = results;
+  } catch (e) {
+    if (e.message === "NO_APP_ID") {
+      status.textContent = "楽天アプリIDが未設定です。「⚙ 設定」から登録してください。";
+      openSettings();
+    } else {
+      status.textContent = "取得できませんでした: " + e.message;
+    }
+  }
+}
+
+function pickRakutenCandidate(idx) {
+  const box = document.getElementById("rkResults");
+  const r = box._results && box._results[idx];
+  if (!r) return;
+  document.getElementById("fImageUrl").value = r.image;
+  pendingMarket = { price: r.price, shop: r.shop, url: r.url,
+    fetchedAt: new Date().toISOString().slice(0, 10) };
+  renderMarketInfo(pendingMarket);
+  // プレビューを即時更新（読み込み失敗時はカバー画像へ）
+  document.getElementById("mPhoto").innerHTML =
+    `<img src="${esc(r.image)}" alt="" referrerpolicy="no-referrer"
+          ${editingId ? `data-fallback-id="${esc(editingId)}"` : ""}>
+     <span class="photo-hint">📷 タップして写真を登録</span>`;
+  document.getElementById("rkStatus").textContent = "取り込みました。「保存」で確定します。";
+}
+
+function renderOwnedSwitch() {
+  document.getElementById("swOwned").className = editingOwned ? "sel-owned" : "";
+  document.getElementById("swWant").className = editingOwned ? "" : "sel-want";
+  document.getElementById("purchaseSection").style.display = editingOwned ? "" : "none";
+}
+
+function renderShopLinks(name) {
+  const kw = "大人の図鑑シール " + name;
+  const q = encodeURIComponent(kw);
+  const shops = [
+    ["Amazon",        `https://www.amazon.co.jp/s?k=${q}`],
+    ["楽天市場",       `https://search.rakuten.co.jp/search/mall/${q}/`],
+    ["Yahoo!ショッピング", `https://shopping.yahoo.co.jp/search?p=${q}`],
+    ["ハンズ",         `https://hands.net/search/?q=${q}`],
+    ["ロフト",         `https://www.loft.co.jp/store/goods/search.aspx?keyword=${q}&search=x`],
+    ["公式ショップ",    `https://www.kamiojapan.shop/view/search?search_keyword=${encodeURIComponent(name)}`],
+  ];
+  document.getElementById("shopLinks").innerHTML = shops.map(([label, url]) =>
+    `<a href="${url}" target="_blank" rel="noopener">${label} ↗</a>`).join("");
+
+  // SNS：購入報告・在庫情報・トレード募集を検索
+  const sns = [
+    ["X 購入報告",     `https://x.com/search?q=${q}&f=live`],
+    ["X 在庫・入荷",   `https://x.com/search?q=${encodeURIComponent(kw + " 入荷 OR 在庫 OR 売ってた")}&f=live`],
+    ["Instagram",      `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent("#大人の図鑑シール")}`],
+    ["メルカリ",       `https://jp.mercari.com/search?keyword=${q}`],
+    ["楽天ラクマ",     `https://fril.jp/s?query=${q}`],
+    ["Yahoo!フリマ",   `https://paypayfleamarket.yahoo.co.jp/search/${q}`],
+  ];
+  document.getElementById("snsLinks").innerHTML = sns.map(([label, url]) =>
+    `<a href="${url}" target="_blank" rel="noopener">${label} ↗</a>`).join("");
+
+  // 商品画像を探す導線（画像アドレスをコピーして上の欄に貼り付け）
+  const imgs = [
+    ["🔍 Google画像検索", `https://www.google.com/search?tbm=isch&q=${q}`],
+    ["🔍 Yahoo!画像検索",  `https://search.yahoo.co.jp/image/search?p=${q}`],
+  ];
+  document.getElementById("imgSearchLinks").innerHTML = imgs.map(([label, url]) =>
+    `<a href="${url}" target="_blank" rel="noopener">${label} ↗</a>`).join("");
+}
+
+function closeDetail() { backdrop.classList.remove("open"); editingId = null; }
+
+function saveDetail() {
+  const name = document.getElementById("fName").value.trim();
+  if (!name) { alert("シール名を入力してください"); return; }
+  let i = editingId ? item(editingId) : null;
+  if (!i) {
+    i = { id: "user_" + Date.now(), emoji: "📔", photo: null };
+    state.items.push(i);
+  }
+  i.name = name;
+  i.category = document.getElementById("fCategory").value;
+  i.desc = document.getElementById("fDesc").value.trim();
+  i.owned = editingOwned;
+  i.purchaseDate = document.getElementById("fDate").value;
+  const price = document.getElementById("fPrice").value;
+  i.price = price === "" ? null : Number(price);
+  i.store = document.getElementById("fStore").value.trim();
+  i.count = Math.max(1, Number(document.getElementById("fCount").value) || 1);
+  i.memo = document.getElementById("fMemo").value.trim();
+  const imageUrl = document.getElementById("fImageUrl").value.trim();
+  i.imageUrl = /^https?:\/\//.test(imageUrl) ? imageUrl : "";
+  if (editingPhoto !== undefined) i.photo = editingPhoto;
+  if (pendingMarket !== undefined) i.market = pendingMarket;
+  save();
+  closeDetail();
+  render();
+}
+
+function deleteDetail() {
+  if (!editingId) return;
+  const i = item(editingId);
+  if (!confirm(`「${i.name}」をコレクション帳から削除しますか？`)) return;
+  state.items = state.items.filter(x => x.id !== editingId);
+  save();
+  closeDetail();
+  render();
+}
+
+/* 写真：縮小してdataURLで保存（localStorage容量対策） */
+function handlePhoto(file) {
+  const img = new Image();
+  img.onload = () => {
+    const max = 480;
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    editingPhoto = canvas.toDataURL("image/jpeg", 0.82);
+    renderPhotoArea(editingId ? item(editingId) : null);
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+/* ============================================================
+ * 設定・一括取得
+ * ============================================================ */
+const settingsBackdrop = document.getElementById("settingsBackdrop");
+let bulkRunning = false;
+
+function openSettings() {
+  document.getElementById("fAppId").value = state.settings.rakutenAppId || "";
+  settingsBackdrop.classList.add("open");
+}
+function closeSettings() { if (!bulkRunning) settingsBackdrop.classList.remove("open"); }
+function saveSettings() {
+  state.settings.rakutenAppId = document.getElementById("fAppId").value.trim();
+  save();
+  closeSettings();
+}
+
+async function bulkFetch() {
+  if (bulkRunning) { bulkRunning = false; return; }
+  const status = document.getElementById("bulkStatus");
+  // フォームのIDを未保存でも使えるよう先に反映
+  state.settings.rakutenAppId = document.getElementById("fAppId").value.trim();
+  save();
+  if (!state.settings.rakutenAppId) { status.textContent = "先に楽天アプリIDを入力してください。"; return; }
+
+  const targets = state.items.filter(i => !i.photo && !i.imageUrl);
+  if (!targets.length) { status.textContent = "画像が未設定のテーマはありません。"; return; }
+
+  bulkRunning = true;
+  document.getElementById("btnBulk").textContent = "⏸ 中断する";
+  let ok = 0, ng = 0;
+  for (let n = 0; n < targets.length && bulkRunning; n++) {
+    const i = targets[n];
+    status.textContent = `取得中 ${n + 1}/${targets.length}: ${i.name}（成功${ok}・見つからず${ng}）`;
+    try {
+      const results = await rakutenSearch("大人の図鑑シール " + i.name);
+      // 検索ノイズ対策：商品名に「図鑑」を含むものを優先
+      const hit = results.find(r => r.name.includes("図鑑") && r.name.includes(i.name)) ||
+                  results.find(r => r.name.includes("図鑑")) || results[0];
+      if (hit) {
+        i.imageUrl = hit.image;
+        i.market = { price: hit.price, shop: hit.shop, url: hit.url,
+          fetchedAt: new Date().toISOString().slice(0, 10) };
+        ok++;
+      } else ng++;
+    } catch (e) {
+      status.textContent = "エラーで中断しました: " + e.message;
+      bulkRunning = false;
+      break;
+    }
+    save(); render();
+    // 楽天APIのレート制限（1リクエスト/秒）を守る
+    await new Promise(r => setTimeout(r, 1100));
+  }
+  if (bulkRunning || ok + ng > 0) {
+    document.getElementById("bulkStatus").textContent =
+      `完了: ${ok}件取得、${ng}件見つかりませんでした。違う商品が入った場合は各シールの詳細画面で取り直せます。`;
+  }
+  bulkRunning = false;
+  document.getElementById("btnBulk").textContent = "未設定テーマの画像を一括取得";
+}
+
+/* ============================================================
+ * 書き出し / 読み込み
+ * ============================================================ */
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `zukan-seal-collection_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importData() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json";
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data || !Array.isArray(data.items)) throw new Error("形式が違います");
+        if (!confirm("現在のデータを読み込んだ内容で置き換えます。よろしいですか？")) return;
+        state = data;
+        save();
+        state = load(); // 新テーマのマージ
+        render();
+      } catch (e) {
+        alert("読み込みに失敗しました: " + e.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+/* ============================================================
+ * イベント
+ * ============================================================ */
+document.getElementById("search").addEventListener("input", e => {
+  filter.q = e.target.value.trim().toLowerCase(); renderGrid();
+});
+document.getElementById("ownFilter").addEventListener("change", e => {
+  filter.own = e.target.value; renderGrid();
+});
+document.getElementById("sortSel").addEventListener("change", e => {
+  filter.sort = e.target.value; renderGrid();
+});
+document.getElementById("catChips").addEventListener("click", e => {
+  const chip = e.target.closest("[data-cat]");
+  if (!chip) return;
+  filter.cat = chip.dataset.cat;
+  renderChips(); renderGrid();
+});
+document.getElementById("grid").addEventListener("click", e => {
+  const toggle = e.target.closest("[data-toggle]");
+  if (toggle) {
+    const i = item(toggle.dataset.toggle);
+    i.owned = !i.owned;
+    if (i.owned && !i.count) i.count = 1;
+    if (i.owned && !i.purchaseDate) i.purchaseDate = new Date().toISOString().slice(0, 10);
+    save(); render();
+    return;
+  }
+  const card = e.target.closest("[data-id]");
+  if (card) openDetail(card.dataset.id);
+});
+document.getElementById("btnAdd").addEventListener("click", () => openDetail(null));
+document.getElementById("btnSettings").addEventListener("click", openSettings);
+document.getElementById("btnSettingsClose").addEventListener("click", closeSettings);
+document.getElementById("btnSettingsSave").addEventListener("click", saveSettings);
+document.getElementById("btnBulk").addEventListener("click", bulkFetch);
+document.getElementById("btnRakuten").addEventListener("click", fetchRakutenCandidates);
+document.getElementById("rkResults").addEventListener("click", e => {
+  const el = e.target.closest("[data-rk]");
+  if (el) pickRakutenCandidate(Number(el.dataset.rk));
+});
+settingsBackdrop.addEventListener("click", e => { if (e.target === settingsBackdrop) closeSettings(); });
+document.getElementById("btnExport").addEventListener("click", exportData);
+document.getElementById("btnImport").addEventListener("click", importData);
+document.getElementById("btnCancel").addEventListener("click", closeDetail);
+document.getElementById("btnSave").addEventListener("click", saveDetail);
+document.getElementById("btnDelete").addEventListener("click", deleteDetail);
+document.getElementById("swOwned").addEventListener("click", () => { editingOwned = true; renderOwnedSwitch(); });
+document.getElementById("swWant").addEventListener("click", () => { editingOwned = false; renderOwnedSwitch(); });
+document.getElementById("mPhoto").addEventListener("click", () => document.getElementById("photoInput").click());
+document.getElementById("photoInput").addEventListener("change", e => {
+  if (e.target.files[0]) handlePhoto(e.target.files[0]);
+  e.target.value = "";
+});
+backdrop.addEventListener("click", e => { if (e.target === backdrop) closeDetail(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDetail(); closeSettings(); } });
+
+// 商品画像URLが読み込めない場合は図鑑風カバーにフォールバック
+document.addEventListener("error", e => {
+  const img = e.target;
+  if (img.tagName === "IMG" && img.dataset.fallbackId) {
+    const i = item(img.dataset.fallbackId);
+    delete img.dataset.fallbackId;
+    if (i) img.src = coverSvg(i);
+  }
+}, true);
+
+save();
+render();
+</script>
+</body>
+</html>
