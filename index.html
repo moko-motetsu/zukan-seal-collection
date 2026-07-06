@@ -1318,12 +1318,17 @@ function rebuildFromOfficial() {
     i.market = null;
   }
 
-  // 2) ノイズ削除: 自動追加テーマのうち、公式に無く所持記録等も無いもの
+  // 2) 公式カタログを正にする: 公式に存在せず、所持記録等も無い項目は
+  //    出どころ（初期収録の手作りテーマか、自動追加テーマか）を問わず削除する。
+  //    所持記録がある項目は、公式の表記と一致しなくても保護のため残す（要確認としてリストアップ）。
   const before = state.items.length;
+  const orphans = [];
   state.items = state.items.filter(i => {
-    if (!i.id.startsWith("user_")) return true;
-    if (i.owned || i.photo || i.purchaseDate || i.memo) return true;
-    return officialKeys.has((i.series || "") + "|" + i.name.normalize("NFKC"));
+    const key = (i.series || "") + "|" + i.name.normalize("NFKC");
+    if (officialKeys.has(key)) return true;
+    const hasRecord = i.owned || i.photo || i.purchaseDate || i.memo || i.price != null || i.store;
+    if (hasRecord) { orphans.push(i.name + (i.series ? "（" + i.series + "）" : "")); return true; }
+    return false;
   });
   const removed = before - state.items.length;
 
@@ -1343,9 +1348,12 @@ function rebuildFromOfficial() {
   applyOfficialImages();
   save();
   render();
+  const orphanNote = orphans.length
+    ? ` ⚠ 所持記録があり公式カタログの表記と一致しなかったため保持: ${orphans.slice(0, 8).join("、")}${orphans.length > 8 ? " ほか" + (orphans.length - 8) + "件" : ""}（テーマ名を公式表記に手直しすると統合できます）`
+    : "";
   status.textContent =
-    `再構築しました: 取得情報のクリア${cleared}件・ノイズ削除${removed}件・公式ラインナップから追加${added}件。` +
-    "画像はすべて公式ショップのものが表示されます。";
+    `再構築しました: 取得情報のクリア${cleared}件・削除${removed}件・公式ラインナップから追加${added}件・合計${state.items.length}件（公式${officialEntries.length}件）。` +
+    "画像はすべて公式ショップのものが表示されます。" + orphanNote;
 }
 
 /* ============================================================
