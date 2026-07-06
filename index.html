@@ -207,6 +207,7 @@
     background: var(--page); text-align: center;
   }
   .rk-item:hover { border-color: var(--accent); }
+  .rk-item.selected { border-color: var(--accent); outline: 2px solid var(--accent); }
   .rk-item img { width: 100%; height: 90px; object-fit: contain; background: #fff; }
   .rk-item .rk-name {
     font-size: 10px; color: var(--text-secondary); padding: 2px 6px 0;
@@ -346,6 +347,15 @@
         <label>カテゴリ</label>
         <select id="fCategory"></select>
       </div>
+      <div class="form-row">
+        <label>シリーズ</label>
+        <select id="fSeries">
+          <option value="">通常</option>
+          <option value="Premium">Premium（W箔押し）</option>
+          <option value="3D">3D（立体クリア）</option>
+          <option value="ミニ">ミニ</option>
+        </select>
+      </div>
     </div>
     <div class="form-row">
       <label>内容・説明</label>
@@ -398,6 +408,16 @@
     <button class="btn primary" id="btnBulk">未設定テーマの画像を一括取得</button>
     <div class="rk-status" id="bulkStatus"></div>
 
+    <div class="section-label">新テーマをさがす</div>
+    <div class="help-text">
+      楽天市場で販売中の「大人の図鑑シール」から、まだこの図鑑に無いテーマを探します。
+      新作・Premium版・3D版の追いかけに便利です。見つかったテーマをタップで選択して追加してください。
+    </div>
+    <button class="btn" id="btnDiscover">楽天で新テーマを検索</button>
+    <div class="rk-status" id="discoverStatus"></div>
+    <div class="rk-results" id="discoverResults"></div>
+    <button class="btn primary" id="btnAddDiscovered" style="display:none;margin-top:10px">選択したテーマを図鑑に追加</button>
+
     <div class="modal-actions">
       <button class="btn" id="btnSettingsClose">閉じる</button>
       <button class="btn primary" id="btnSettingsSave">保存</button>
@@ -415,7 +435,7 @@
  * ============================================================ */
 const CATEGORIES = [
   "生き物（陸）", "海・水の生き物", "鳥", "植物・きのこ",
-  "自然・科学", "食べ物", "飲み物", "乗り物・建物", "その他"
+  "自然・科学", "食べ物", "飲み物", "乗り物・建物", "文化・芸術", "その他"
 ];
 
 const SEED = [
@@ -480,10 +500,41 @@ const SEED = [
   s("乗り物",            "乗り物・建物", "🚃", "電車・バス・働く車など乗り物大集合"),
   s("建築物",            "乗り物・建物", "🏛️", "世界と日本の名建築をあつめた一枚"),
   s("世界遺産",          "乗り物・建物", "🗼", "世界遺産の名所を図鑑風に収録"),
+  // --- 生き物・鳥 追加 ---
+  s("日本犬",            "生き物（陸）", "🐕", "柴犬・秋田犬など日本生まれの犬たち"),
+  s("鳥",                "鳥", "🕊️", "身近な野鳥から世界の鳥まで"),
+  s("ウミウシ",          "海・水の生き物", "🐌", "カラフルな海の宝石・ウミウシの世界"),
+  // --- 自然・科学 追加 ---
+  s("天体",              "自然・科学", "🌌", "惑星・彗星・星団など天体観測の世界"),
+  // --- 文化・芸術 ---
+  s("古代エジプト",      "文化・芸術", "🏺", "ピラミッド・ファラオ・神々の古代エジプト"),
+  s("芸術",              "文化・芸術", "🎨", "世界の名画・美術をあつめた芸術編"),
+  s("縄文古墳",          "文化・芸術", "🗿", "土偶・埴輪・古墳など日本の古代ロマン"),
+  s("博物館",            "文化・芸術", "🦴", "博物館の展示品をめぐる一枚"),
+  s("楽器",              "文化・芸術", "🎻", "オーケストラから民族楽器まで"),
+  s("文房具",            "文化・芸術", "✒️", "レトロ文具・筆記具の世界"),
+  // --- Premium大人の図鑑シール（2025年10月〜・W箔押し＆エンボス・全9種） ---
+  s("古代エジプト",      "文化・芸術", "🏺", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  s("芸術",              "文化・芸術", "🎨", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  s("縄文古墳",          "文化・芸術", "🗿", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  s("深海魚",            "海・水の生き物", "🐟", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  s("楽器",              "文化・芸術", "🎻", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  s("恐竜",              "生き物（陸）", "🦖", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  s("寿司",              "食べ物", "🍣", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  s("世界遺産",          "乗り物・建物", "🗼", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  s("天体",              "自然・科学", "🌌", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  // --- 3D大人の図鑑シール（ぷっくり立体クリア仕様） ---
+  s("ウミウシ",          "海・水の生き物", "🐌", "ぷっくり立体のクリア仕様3D版", "3D"),
+  s("クラゲ",            "海・水の生き物", "🪼", "ぷっくり立体のクリア仕様3D版", "3D"),
+  s("スーパー",          "食べ物", "🛒", "ぷっくり立体のクリア仕様3D版", "3D"),
+  s("パン",              "食べ物", "🥐", "ぷっくり立体のクリア仕様3D版", "3D"),
+  s("古代エジプト",      "文化・芸術", "🏺", "ぷっくり立体のクリア仕様3D版", "3D"),
+  s("鉱物",              "自然・科学", "💎", "ぷっくり立体のクリア仕様3D版", "3D"),
 ];
 
-function s(name, category, emoji, desc) {
-  return { id: "seed_" + name, name, category, emoji, desc };
+function s(name, category, emoji, desc, series) {
+  return { id: "seed_" + (series ? series + "_" : "") + name,
+    name, category, emoji, desc, series: series || "" };
 }
 
 /* ============================================================
@@ -547,7 +598,7 @@ function coverSvg(i) {
   <rect width="240" height="170" fill="${bg}"/>
   <rect x="7" y="7" width="226" height="156" fill="none" stroke="#c9a227" stroke-width="2" rx="6"/>
   <rect x="12" y="12" width="216" height="146" fill="none" stroke="${ink}" stroke-width="0.8" rx="4" opacity="0.5"/>
-  <text x="120" y="30" text-anchor="middle" font-family="serif" font-size="11" fill="${ink}" opacity="0.85">— 大人の図鑑 —</text>
+  <text x="120" y="30" text-anchor="middle" font-family="serif" font-size="11" fill="${ink}" opacity="0.85">— 大人の図鑑${i.series ? " " + i.series : ""} —</text>
   <text x="120" y="96" text-anchor="middle" font-size="52">${emoji}</text>
   <text x="26" y="70" text-anchor="middle" font-size="16" opacity="0.55">${emoji}</text>
   <text x="214" y="70" text-anchor="middle" font-size="16" opacity="0.55">${emoji}</text>
@@ -574,7 +625,8 @@ function siteOrigin() {
     ? location.origin : "（このアプリをWebサーバー上で開いてください）";
 }
 
-async function rakutenSearch(keyword) {
+async function rakutenSearch(keyword, opts) {
+  opts = opts || {};
   const appId = normalizeKey(state.settings.rakutenAppId);
   const accessKey = normalizeKey(state.settings.rakutenAccessKey);
   if (!appId || !accessKey) throw new Error("NO_APP_ID");
@@ -582,7 +634,9 @@ async function rakutenSearch(keyword) {
     "?applicationId=" + encodeURIComponent(appId) +
     "&accessKey=" + encodeURIComponent(accessKey) +
     "&keyword=" + encodeURIComponent(keyword) +
-    "&hits=8&imageFlag=1&formatVersion=2&format=json";
+    "&hits=" + (opts.hits || 8) +
+    "&page=" + (opts.page || 1) +
+    "&imageFlag=1&formatVersion=2&format=json";
   let res;
   try {
     res = await fetch(url);
@@ -705,6 +759,7 @@ function visibleItems() {
     if (filter.own === "owned" && !i.owned) return false;
     if (filter.own === "want" && i.owned) return false;
     if (filter.q && !i.name.toLowerCase().includes(filter.q) &&
+        !(i.series || "").toLowerCase().includes(filter.q) &&
         !(i.desc || "").toLowerCase().includes(filter.q)) return false;
     return true;
   });
@@ -731,7 +786,7 @@ function renderGrid() {
         <span class="badge ${i.owned ? "" : "want"}">${i.owned ? "持ってる" + (i.count > 1 ? " ×" + i.count : "") : "未入手"}</span>
         <button class="own-toggle ${i.owned ? "on" : ""}" data-toggle="${esc(i.id)}" title="所持を切り替え">✓</button>
         <div class="body">
-          <div class="name">${esc(i.name)}</div>
+          <div class="name">${esc(i.name)}${i.series ? ` <span style="color:#c9a227;font-size:11px;font-weight:700">${esc(i.series)}</span>` : ""}</div>
           <div class="cat">${esc(i.category)}</div>
           <div class="meta">${esc(meta)}</div>
         </div>
@@ -754,8 +809,9 @@ function openDetail(id) {
   document.getElementById("rkResults").innerHTML = "";
   document.getElementById("rkStatus").textContent = "";
 
-  document.getElementById("mName").textContent = i ? i.name : "新しいシールを追加";
+  document.getElementById("mName").textContent = i ? i.name + (i.series ? "（" + i.series + "）" : "") : "新しいシールを追加";
   document.getElementById("mCat").textContent = i ? i.category : "";
+  document.getElementById("fSeries").value = i ? (i.series || "") : "";
   document.getElementById("fName").value = i ? i.name : "";
   document.getElementById("fDesc").value = i ? (i.desc || "") : "";
   document.getElementById("fDate").value = i ? (i.purchaseDate || "") : "";
@@ -777,7 +833,7 @@ function openDetail(id) {
 
   renderPhotoArea(i);
   renderOwnedSwitch();
-  renderShopLinks(i ? i.name : "");
+  renderShopLinks(i ? (i.series ? i.series + " " : "") + i.name : "");
   backdrop.classList.add("open");
 }
 
@@ -810,11 +866,12 @@ async function fetchRakutenCandidates() {
   const status = document.getElementById("rkStatus");
   const box = document.getElementById("rkResults");
   const name = document.getElementById("fName").value.trim();
+  const series = document.getElementById("fSeries").value;
   if (!name) { status.textContent = "先にシール名を入力してください"; return; }
   box.innerHTML = "";
   status.textContent = "検索中…";
   try {
-    const results = await rakutenSearch("大人の図鑑シール " + name);
+    const results = await rakutenSearch((series ? series + " " : "") + "大人の図鑑シール " + name);
     if (!results.length) { status.textContent = "見つかりませんでした（名前を変えて試してください）"; return; }
     status.textContent = "使いたい商品をタップしてください:";
     box.innerHTML = results.map((r, idx) => `
@@ -903,6 +960,7 @@ function saveDetail() {
   }
   i.name = name;
   i.category = document.getElementById("fCategory").value;
+  i.series = document.getElementById("fSeries").value;
   i.desc = document.getElementById("fDesc").value.trim();
   i.owned = editingOwned;
   i.purchaseDate = document.getElementById("fDate").value;
@@ -1006,7 +1064,7 @@ async function bulkFetch() {
     const i = targets[n];
     status.textContent = `取得中 ${n + 1}/${targets.length}: ${i.name}（成功${ok}・見つからず${ng}）`;
     try {
-      const results = await rakutenSearch("大人の図鑑シール " + i.name);
+      const results = await rakutenSearch((i.series ? i.series + " " : "") + "大人の図鑑シール " + i.name);
       // 検索ノイズ対策：商品名に「図鑑」を含むものを優先
       const hit = results.find(r => r.name.includes("図鑑") && r.name.includes(i.name)) ||
                   results.find(r => r.name.includes("図鑑")) || results[0];
@@ -1031,6 +1089,102 @@ async function bulkFetch() {
   }
   bulkRunning = false;
   document.getElementById("btnBulk").textContent = "未設定テーマの画像を一括取得";
+}
+
+/* ============================================================
+ * 新テーマ発見（楽天の販売中商品からテーマ名を抽出）
+ * ============================================================ */
+// 商品名からテーマ名とシリーズを推定する。例:
+// 「カミオジャパン 大人の図鑑シール 鉱物2 204770」→ {theme:"鉱物2", series:""}
+function parseThemeFromItemName(itemName) {
+  const m = itemName.match(/大人の図鑑シール/);
+  if (!m) return null;
+  let series = "";
+  if (/premium|プレミアム/i.test(itemName)) series = "Premium";
+  else if (/3D/i.test(itemName)) series = "3D";
+  else if (/ミニ/.test(itemName)) series = "ミニ";
+  let rest = itemName.slice(m.index + m[0].length).normalize("NFKC");
+  rest = rest.replace(/^[\s:：・/｜|]+/, "");
+  const t = rest.match(/^[ぁ-んァ-ヶー一-龠々0-9a-zA-Z（）()・]+/);
+  if (!t) return null;
+  let theme = t[0]
+    .replace(/[0-9]{4,}.*$/, "")           // 品番らしき長い数字以降を除去
+    .replace(/(シール|シート|全\d+種).*$/, "")
+    .trim();
+  if (!theme || theme.length > 12) return null;
+  return { theme, series };
+}
+
+function themeExists(theme, series) {
+  return state.items.some(i =>
+    i.name.normalize("NFKC") === theme && (i.series || "") === series);
+}
+
+let discovered = [];
+
+async function discoverThemes() {
+  const status = document.getElementById("discoverStatus");
+  const box = document.getElementById("discoverResults");
+  const addBtn = document.getElementById("btnAddDiscovered");
+  readSettingsForm();
+  if (!state.settings.rakutenAppId || !state.settings.rakutenAccessKey) {
+    status.textContent = "先に楽天アプリIDとアクセスキーを入力してください。"; return;
+  }
+  box.innerHTML = ""; addBtn.style.display = "none";
+  discovered = [];
+  const seen = new Set();
+  try {
+    for (let page = 1; page <= 3; page++) {
+      status.textContent = `販売中の商品を調査中… (${page}/3ページ)`;
+      const results = await rakutenSearch("大人の図鑑シール", { hits: 30, page });
+      for (const r of results) {
+        const p = parseThemeFromItemName(r.name);
+        if (!p) continue;
+        const key = p.series + "|" + p.theme;
+        if (seen.has(key) || themeExists(p.theme, p.series)) continue;
+        seen.add(key);
+        discovered.push({ ...p, price: r.price, shop: r.shop, url: r.url, image: r.image });
+      }
+      if (page < 3) await new Promise(res => setTimeout(res, 1700));
+    }
+  } catch (e) {
+    status.textContent = "検索に失敗しました: " + e.message;
+    return;
+  }
+  if (!discovered.length) {
+    status.textContent = "新しいテーマは見つかりませんでした（図鑑は最新の状態です）。";
+    return;
+  }
+  status.textContent = `${discovered.length}件の未収録テーマが見つかりました。追加したいものをタップして選択:`;
+  box.innerHTML = discovered.map((d, idx) => `
+    <div class="rk-item selected" data-disc="${idx}">
+      <img src="${esc(d.image)}" alt="" referrerpolicy="no-referrer">
+      <div class="rk-name">${esc(d.theme)}${d.series ? "（" + esc(d.series) + "）" : ""}</div>
+      <div class="rk-price">${yen(d.price)}</div>
+    </div>`).join("");
+  addBtn.style.display = "";
+}
+
+function addDiscovered() {
+  const box = document.getElementById("discoverResults");
+  const chosen = [...box.querySelectorAll(".rk-item.selected")]
+    .map(el => discovered[Number(el.dataset.disc)]).filter(Boolean);
+  if (!chosen.length) { document.getElementById("discoverStatus").textContent = "追加するテーマをタップで選択してください。"; return; }
+  const today = new Date().toISOString().slice(0, 10);
+  chosen.forEach((d, n) => {
+    state.items.push({
+      id: "user_" + Date.now() + "_" + n,
+      name: d.theme, series: d.series, category: "その他", emoji: "📔", desc: "",
+      owned: false, count: 0, photo: null, imageUrl: d.image,
+      market: { price: d.price, shop: d.shop, url: d.url, fetchedAt: today },
+      purchaseDate: "", price: null, store: "", memo: "",
+    });
+  });
+  save(); render();
+  document.getElementById("discoverStatus").textContent =
+    `${chosen.length}件を追加しました（カテゴリは「その他」になっています。詳細画面で変更できます）。`;
+  document.getElementById("discoverResults").innerHTML = "";
+  document.getElementById("btnAddDiscovered").style.display = "none";
 }
 
 /* ============================================================
@@ -1108,6 +1262,12 @@ document.getElementById("btnSettingsClose").addEventListener("click", closeSetti
 document.getElementById("btnSettingsSave").addEventListener("click", saveSettings);
 document.getElementById("btnBulk").addEventListener("click", bulkFetch);
 document.getElementById("btnTestApi").addEventListener("click", testApi);
+document.getElementById("btnDiscover").addEventListener("click", discoverThemes);
+document.getElementById("btnAddDiscovered").addEventListener("click", addDiscovered);
+document.getElementById("discoverResults").addEventListener("click", e => {
+  const el = e.target.closest("[data-disc]");
+  if (el) el.classList.toggle("selected");
+});
 document.getElementById("btnRakuten").addEventListener("click", fetchRakutenCandidates);
 document.getElementById("rkResults").addEventListener("click", e => {
   const el = e.target.closest("[data-rk]");
