@@ -1143,8 +1143,11 @@ function parseThemeFromItemName(itemName) {
   let theme = t[0]
     .replace(/[0-9]{4,}.*$/, "")           // 品番らしき長い数字以降を除去
     .replace(/(シール|シート|全\d+種).*$/, "")
+    .replace(/編$/, "")                    // 「天体編」→「天体」の表記ゆれを吸収
     .trim();
   if (!theme || theme.length > 12) return null;
+  // シール本体ではない周辺グッズやまとめ売りはテーマとして扱わない
+  if (/(収納|リフィル|ファイル|台紙|ホルダー|バインダー|セット|福袋|アソート|まとめ|選べる|お楽しみ)/.test(theme)) return null;
   return { theme, series };
 }
 
