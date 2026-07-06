@@ -451,15 +451,15 @@ const CATEGORIES = [
 const SEED = [
   // --- 生き物（陸） ---
   s("動物園",            "生き物（陸）", "🦁", "ライオン・ゾウ・キリンなど動物園の人気者を図鑑風に収録"),
-  s("パンダ",            "生き物（陸）", "🐼", "ジャイアントパンダの仕草・生態をあつめた一枚"),
+  s("パンダの生態",      "生き物（陸）", "🐼", "ジャイアントパンダの仕草・生態をあつめた一枚"),
   s("日本猫",            "生き物（陸）", "🐈", "三毛・キジトラなど日本の猫の毛色・種類"),
-  s("猫（長毛種）",      "生き物（陸）", "🐈‍⬛", "ペルシャ・メインクーンなど長毛種の猫"),
+  s("猫・長毛種",        "生き物（陸）", "🐈‍⬛", "ペルシャ・メインクーンなど長毛種の猫"),
   s("昆虫",              "生き物（陸）", "🪲", "カブトムシ・クワガタ・チョウなど昆虫の世界"),
   s("爬虫類",            "生き物（陸）", "🦎", "ヤモリ・ヘビ・トカゲなど爬虫類たち"),
   s("カエル",            "生き物（陸）", "🐸", "国内外のカエルの種類をあつめた一枚"),
   s("恐竜",              "生き物（陸）", "🦖", "ティラノサウルスをはじめ古代の恐竜たち"),
   // --- 海・水の生き物 ---
-  s("海の生き物",        "海・水の生き物", "🐬", "イルカ・ウミガメなど海の人気者たち"),
+  s("海洋生物",          "海・水の生き物", "🐬", "イルカ・ウミガメなど海の人気者たち"),
   s("深海魚",            "海・水の生き物", "🐟", "チョウチンアンコウなど深海の不思議な生き物"),
   s("クラゲ",            "海・水の生き物", "🪼", "ゆらゆら漂うクラゲの種類いろいろ"),
   s("金魚",              "海・水の生き物", "🐠", "琉金・出目金など観賞魚の代表・金魚"),
@@ -467,7 +467,7 @@ const SEED = [
   // --- 鳥 ---
   s("フクロウ",          "鳥", "🦉", "フクロウ・ミミズクの仲間たち"),
   s("文鳥",              "鳥", "🐦", "白文鳥・桜文鳥などかわいい文鳥"),
-  s("インコ",            "鳥", "🦜", "セキセイインコなど人気の飼い鳥"),
+  s("インコの気持ち",    "鳥", "🦜", "セキセイインコなど人気の飼い鳥"),
   // --- 植物・きのこ ---
   s("多肉植物",          "植物・きのこ", "🌵", "エケベリア・ハオルチアなど多肉植物"),
   s("きのこ",            "植物・きのこ", "🍄", "食用から毒きのこまで、きのこの世界"),
@@ -519,14 +519,14 @@ const SEED = [
   // --- 文化・芸術 ---
   s("古代エジプト",      "文化・芸術", "🏺", "ピラミッド・ファラオ・神々の古代エジプト"),
   s("芸術",              "文化・芸術", "🎨", "世界の名画・美術をあつめた芸術編"),
-  s("縄文古墳",          "文化・芸術", "🗿", "土偶・埴輪・古墳など日本の古代ロマン"),
+  s("縄文・古墳時代",    "文化・芸術", "🗿", "土偶・埴輪・古墳など日本の古代ロマン"),
   s("博物館",            "文化・芸術", "🦴", "博物館の展示品をめぐる一枚"),
   s("楽器",              "文化・芸術", "🎻", "オーケストラから民族楽器まで"),
   s("文房具",            "文化・芸術", "✒️", "レトロ文具・筆記具の世界"),
   // --- Premium大人の図鑑シール（2025年10月〜・W箔押し＆エンボス・全9種） ---
   s("古代エジプト",      "文化・芸術", "🏺", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
   s("芸術",              "文化・芸術", "🎨", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
-  s("縄文古墳",          "文化・芸術", "🗿", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
+  s("縄文・古墳時代",    "文化・芸術", "🗿", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
   s("深海魚",            "海・水の生き物", "🐟", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
   s("楽器",              "文化・芸術", "🎻", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
   s("恐竜",              "生き物（陸）", "🦖", "金箔＋カラー箔のW箔押し・エンボス加工のPremium版", "Premium"),
@@ -717,7 +717,9 @@ function applyOfficialImages() {
   }
 }
 
-fetch("official_catalog.json")
+// 「公式ショップから検索」「公式情報を正として再構築」等は、ページ読み込み直後の
+// フェッチ完了前にボタンが押されてもカタログが空扱いにならないよう、このPromiseを待つ。
+const officialCatalogReady = fetch("official_catalog.json")
   .then(r => (r.ok ? r.json() : null))
   .then(data => {
     if (!data || !Array.isArray(data.products)) return;
@@ -1134,29 +1136,33 @@ async function bulkFetch() {
 /* ============================================================
  * 新テーマ発見（楽天の販売中商品からテーマ名を抽出）
  * ============================================================ */
-// 商品名からテーマ名とシリーズを推定する。例:
-// 「カミオジャパン 大人の図鑑シール 鉱物2 204770」→ {theme:"鉱物2", series:""}
-// 「大人の図鑑 3Dシール クラゲ」→ {theme:"クラゲ", series:"3D"}
+// 商品名からテーマ名とシリーズを推定する。公式ショップの商品名には
+// 発送日・購入制限の注記や価格・在庫状況が付随するため、まずそれらを除去してから
+// 「大人の図鑑シール」以降の残り全体をテーマ名として扱う（文字種で区切ると
+// 「エリートバナナ バナ夫」のようにスペースを含む名前が途中で切れてしまうため）。
+// 例:「大人の図鑑シール/鉱物2 330 円(税込) 品切れ」→ {theme:"鉱物2", series:""}
+//     「大人の図鑑 3Dシール クラゲ」→ {theme:"クラゲ", series:"3D"}
 function parseThemeFromItemName(itemName) {
-  const n = String(itemName).normalize("NFKC");
+  let n = String(itemName).normalize("NFKC");
+  n = n.replace(/【[^】]*】/g, "");            // 発送日・購入制限などの注記を除去
+  n = n.replace(/[0-9,]+\s*円[\s\S]*$/, "");  // 価格・税込・在庫状況を除去
+  n = n.replace(/\s+/g, " ").trim();
+
   const m = n.match(/大人の図鑑\s*(?:Premium|プレミアム|3D|ミニ)?\s*シール/i);
   if (!m) return null;
   let series = "";
   if (/premium|プレミアム/i.test(n)) series = "Premium";
   else if (/3D/i.test(n)) series = "3D";
   else if (/ミニ/.test(n)) series = "ミニ";
-  let rest = n.slice(m.index + m[0].length);
-  rest = rest.replace(/^[\s:：・/｜|]+/, "");
-  const t = rest.match(/^[ぁ-んァ-ヶー一-龠々0-9a-zA-Z（）()・]+/);
-  if (!t) return null;
-  let theme = t[0]
-    .replace(/[0-9]{4,}.*$/, "")           // 品番らしき長い数字以降を除去
-    .replace(/(シール|シート|全\d+種).*$/, "")
-    .replace(/編$/, "")                    // 「天体編」→「天体」の表記ゆれを吸収
+
+  let theme = n.slice(m.index + m[0].length)
+    .replace(/^[\s:：・\/｜|]+/, "")
+    .replace(/[\s:：・\/｜|]+$/, "")
+    .replace(/編$/, "")                     // 「天体編」→「天体」の表記ゆれを吸収
     .trim();
-  if (!theme || theme.length > 12) return null;
+  if (!theme || theme.length > 20) return null;
   // シール本体ではない周辺グッズやまとめ売りはテーマとして扱わない
-  if (/(収納|リフィル|ファイル|台紙|ホルダー|バインダー|セット|福袋|アソート|まとめ|選べる|お楽しみ)/.test(theme)) return null;
+  if (/(収納|リフィル|ファイル|台紙|ホルダー|バインダー|セット|福袋|アソート|まとめ|選べる|お楽しみ|枚セット)/.test(theme)) return null;
   return { theme, series };
 }
 
@@ -1211,13 +1217,17 @@ async function discoverThemes() {
 }
 
 // 公式カタログ（official_catalog.json）から未収録テーマを探す。楽天キー不要。
-function discoverFromOfficial() {
+async function discoverFromOfficial() {
   const status = document.getElementById("discoverStatus");
   const box = document.getElementById("discoverResults");
   const addBtn = document.getElementById("btnAddDiscovered");
   box.innerHTML = ""; addBtn.style.display = "none";
   if (!officialCatalog.length) {
-    status.textContent = "公式カタログがまだ取得されていません（公開ページで開いているか、カタログ生成ワークフローの実行を確認してください）。";
+    status.textContent = "公式カタログを読み込み中…";
+    await officialCatalogReady;
+  }
+  if (!officialCatalog.length) {
+    status.textContent = "公式カタログがまだ取得できませんでした（公開ページで開いているか、カタログ生成ワークフローの実行を確認してください）。";
     return;
   }
   discovered = [];
@@ -1288,10 +1298,14 @@ function guessCategory(theme) {
   return "その他";
 }
 
-function rebuildFromOfficial() {
+async function rebuildFromOfficial() {
   const status = document.getElementById("rebuildStatus");
   if (!officialCatalog.length) {
-    status.textContent = "公式カタログが読み込まれていません（公開ページで開いているか確認してください）。";
+    status.textContent = "公式カタログを読み込み中…";
+    await officialCatalogReady;
+  }
+  if (!officialCatalog.length) {
+    status.textContent = "公式カタログがまだ取得できませんでした（公開ページで開いているか確認してください）。";
     return;
   }
   if (!confirm(
