@@ -413,6 +413,7 @@
       楽天市場で販売中の「大人の図鑑シール」から、まだこの図鑑に無いテーマを探します。
       新作・Premium版・3D版の追いかけに便利です。見つかったテーマをタップで選択して追加してください。
     </div>
+    <button class="btn" id="btnDiscoverOfficial">公式ショップの一覧から検索（キー不要）</button>
     <button class="btn" id="btnDiscover">楽天で新テーマを検索</button>
     <div class="rk-status" id="discoverStatus"></div>
     <div class="rk-results" id="discoverResults"></div>
@@ -682,12 +683,40 @@ function marketLabel(m) {
 
 function coverImgTag(i) {
   if (i.photo) return `<img src="${i.photo}" alt="${esc(i.name)}">`;
-  if (i.imageUrl) {
-    // 通販サイトの画像を参照表示（読み込めない場合は図鑑風カバーに自動フォールバック）
-    return `<img src="${esc(i.imageUrl)}" alt="${esc(i.name)}" referrerpolicy="no-referrer" data-fallback-id="${esc(i.id)}">`;
+  // 通販/公式サイトの画像を参照表示（読み込めない場合は図鑑風カバーに自動フォールバック）
+  const ref = i.imageUrl || i.officialImage;
+  if (ref) {
+    return `<img src="${esc(ref)}" alt="${esc(i.name)}" referrerpolicy="no-referrer" data-fallback-id="${esc(i.id)}">`;
   }
   return `<img src="${coverSvg(i)}" alt="${esc(i.name)}">`;
 }
+
+/* ============================================================
+ * 公式カタログ（カミオジャパン公式ショップの商品名・画像URL一覧）
+ * GitHub Actionsが週1回 official_catalog.json を生成する。
+ * 画像は公式サーバーから参照表示するだけで、コピーは保存しない。
+ * ============================================================ */
+let officialCatalog = [];
+
+function applyOfficialImages() {
+  for (const c of officialCatalog) {
+    const p = parseThemeFromItemName(c.name);
+    if (!p) continue;
+    const it = state.items.find(i =>
+      i.name.normalize("NFKC") === p.theme && (i.series || "") === p.series);
+    if (it) { it.officialImage = c.image; it.officialUrl = c.url; }
+  }
+}
+
+fetch("official_catalog.json")
+  .then(r => (r.ok ? r.json() : null))
+  .then(data => {
+    if (!data || !Array.isArray(data.products)) return;
+    officialCatalog = data.products;
+    applyOfficialImages();
+    render();
+  })
+  .catch(() => { /* file://やカタログ未生成時は図鑑風カバーで表示 */ });
 
 /* ============================================================
  * 描画
@@ -833,7 +862,7 @@ function openDetail(id) {
 
   renderPhotoArea(i);
   renderOwnedSwitch();
-  renderShopLinks(i ? (i.series ? i.series + " " : "") + i.name : "");
+  renderShopLinks(i ? (i.series ? i.series + " " : "") + i.name : "", i ? i.officialUrl : "");
   backdrop.classList.add("open");
 }
 
@@ -841,10 +870,11 @@ function renderPhotoArea(i) {
   const el = document.getElementById("mPhoto");
   const photo = editingPhoto !== undefined ? editingPhoto : (i ? i.photo : null);
   let img;
+  const ref = i && (i.imageUrl || i.officialImage);
   if (photo) {
     img = `<img src="${photo}" alt="">`;
-  } else if (i && i.imageUrl) {
-    img = `<img src="${esc(i.imageUrl)}" alt="" referrerpolicy="no-referrer" data-fallback-id="${esc(i.id)}">`;
+  } else if (ref) {
+    img = `<img src="${esc(ref)}" alt="" referrerpolicy="no-referrer" data-fallback-id="${esc(i.id)}">`;
   } else if (i) {
     img = `<img src="${coverSvg(i)}" alt="">`;
   } else {
@@ -913,10 +943,11 @@ function renderOwnedSwitch() {
   document.getElementById("purchaseSection").style.display = editingOwned ? "" : "none";
 }
 
-function renderShopLinks(name) {
+function renderShopLinks(name, officialUrl) {
   const kw = "大人の図鑑シール " + name;
   const q = encodeURIComponent(kw);
   const shops = [
+    ...(officialUrl ? [["★ 公式商品ページ", officialUrl]] : []),
     ["Amazon",        `https://www.amazon.co.jp/s?k=${q}`],
     ["楽天市場",       `https://search.rakuten.co.jp/search/mall/${q}/`],
     ["Yahoo!ショッピング", `https://shopping.yahoo.co.jp/search?p=${q}`],
@@ -1096,14 +1127,16 @@ async function bulkFetch() {
  * ============================================================ */
 // 商品名からテーマ名とシリーズを推定する。例:
 // 「カミオジャパン 大人の図鑑シール 鉱物2 204770」→ {theme:"鉱物2", series:""}
+// 「大人の図鑑 3Dシール クラゲ」→ {theme:"クラゲ", series:"3D"}
 function parseThemeFromItemName(itemName) {
-  const m = itemName.match(/大人の図鑑シール/);
+  const n = String(itemName).normalize("NFKC");
+  const m = n.match(/大人の図鑑\s*(?:Premium|プレミアム|3D|ミニ)?\s*シール/i);
   if (!m) return null;
   let series = "";
-  if (/premium|プレミアム/i.test(itemName)) series = "Premium";
-  else if (/3D/i.test(itemName)) series = "3D";
-  else if (/ミニ/.test(itemName)) series = "ミニ";
-  let rest = itemName.slice(m.index + m[0].length).normalize("NFKC");
+  if (/premium|プレミアム/i.test(n)) series = "Premium";
+  else if (/3D/i.test(n)) series = "3D";
+  else if (/ミニ/.test(n)) series = "ミニ";
+  let rest = n.slice(m.index + m[0].length);
   rest = rest.replace(/^[\s:：・/｜|]+/, "");
   const t = rest.match(/^[ぁ-んァ-ヶー一-龠々0-9a-zA-Z（）()・]+/);
   if (!t) return null;
@@ -1165,6 +1198,40 @@ async function discoverThemes() {
   addBtn.style.display = "";
 }
 
+// 公式カタログ（official_catalog.json）から未収録テーマを探す。楽天キー不要。
+function discoverFromOfficial() {
+  const status = document.getElementById("discoverStatus");
+  const box = document.getElementById("discoverResults");
+  const addBtn = document.getElementById("btnAddDiscovered");
+  box.innerHTML = ""; addBtn.style.display = "none";
+  if (!officialCatalog.length) {
+    status.textContent = "公式カタログがまだ取得されていません（公開ページで開いているか、カタログ生成ワークフローの実行を確認してください）。";
+    return;
+  }
+  discovered = [];
+  const seen = new Set();
+  for (const c of officialCatalog) {
+    const p = parseThemeFromItemName(c.name);
+    if (!p) continue;
+    const key = p.series + "|" + p.theme;
+    if (seen.has(key) || themeExists(p.theme, p.series)) continue;
+    seen.add(key);
+    discovered.push({ ...p, price: null, shop: "カミオジャパン公式", url: c.url, image: c.image });
+  }
+  if (!discovered.length) {
+    status.textContent = "公式ショップの一覧と比べて、未収録のテーマはありませんでした。";
+    return;
+  }
+  status.textContent = `${discovered.length}件の未収録テーマが見つかりました。追加したいものをタップで選択:`;
+  box.innerHTML = discovered.map((d, idx) => `
+    <div class="rk-item selected" data-disc="${idx}">
+      <img src="${esc(d.image)}" alt="" referrerpolicy="no-referrer">
+      <div class="rk-name">${esc(d.theme)}${d.series ? "（" + esc(d.series) + "）" : ""}</div>
+      <div class="rk-price">${d.price ? yen(d.price) : "公式"}</div>
+    </div>`).join("");
+  addBtn.style.display = "";
+}
+
 function addDiscovered() {
   const box = document.getElementById("discoverResults");
   const chosen = [...box.querySelectorAll(".rk-item.selected")]
@@ -1176,7 +1243,8 @@ function addDiscovered() {
       id: "user_" + Date.now() + "_" + n,
       name: d.theme, series: d.series, category: "その他", emoji: "📔", desc: "",
       owned: false, count: 0, photo: null, imageUrl: d.image,
-      market: { price: d.price, shop: d.shop, url: d.url, fetchedAt: today },
+      officialUrl: d.shop === "カミオジャパン公式" ? d.url : "",
+      market: d.price ? { price: d.price, shop: d.shop, url: d.url, fetchedAt: today } : null,
       purchaseDate: "", price: null, store: "", memo: "",
     });
   });
@@ -1263,6 +1331,7 @@ document.getElementById("btnSettingsSave").addEventListener("click", saveSetting
 document.getElementById("btnBulk").addEventListener("click", bulkFetch);
 document.getElementById("btnTestApi").addEventListener("click", testApi);
 document.getElementById("btnDiscover").addEventListener("click", discoverThemes);
+document.getElementById("btnDiscoverOfficial").addEventListener("click", discoverFromOfficial);
 document.getElementById("btnAddDiscovered").addEventListener("click", addDiscovered);
 document.getElementById("discoverResults").addEventListener("click", e => {
   const el = e.target.closest("[data-disc]");
