@@ -419,6 +419,15 @@
     <div class="rk-results" id="discoverResults"></div>
     <button class="btn primary" id="btnAddDiscovered" style="display:none;margin-top:10px">選択したテーマを図鑑に追加</button>
 
+    <div class="section-label">公式カタログを正にする</div>
+    <div class="help-text">
+      楽天などから取得した画像・参考価格をすべてクリアし、カミオジャパン公式ショップの
+      ラインナップに合わせて図鑑を再構築します。<b>所持記録・購入情報・自分で撮った写真・メモは保持されます。</b>
+      自動追加されたテーマのうち、公式に存在せず所持記録も無いもの（ノイズ）は削除されます。
+    </div>
+    <button class="btn danger" id="btnRebuildOfficial">公式情報を正として再構築</button>
+    <div class="rk-status" id="rebuildStatus"></div>
+
     <div class="modal-actions">
       <button class="btn" id="btnSettingsClose">閉じる</button>
       <button class="btn primary" id="btnSettingsSave">保存</button>
@@ -1259,6 +1268,87 @@ function addDiscovered() {
 }
 
 /* ============================================================
+ * 公式カタログを正として再構築
+ * ============================================================ */
+// 公式ラインナップから追加するテーマのカテゴリを名前から推定する（外れたら手で直せる）
+const CATEGORY_HINTS = [
+  ["食べ物",         /寿司|パン|カレー|うどん|そば|ラーメン|パスタ|ピザ|餃子|麺|丼|どんぶり|弁当|菓子|スイーツ|グミ|チョコ|ケーキ|アイス|中華|焼肉|屋台|居酒屋|ファミレス|卵|米|スーパー|飯|料理|おにぎり|フルーツ|野菜|おでん|鍋/],
+  ["飲み物",         /コーヒー|お茶|紅茶|カクテル|ジュース|ソーダ|喫茶|ドリンク|酒|ビール|ワイン/],
+  ["海・水の生き物", /海|深海|魚|クラゲ|ウミウシ|金魚|メダカ|サメ|ペンギン|イルカ|クジラ|貝|エビ|カニ|タコ|イカ|カメ/],
+  ["鳥",             /鳥|インコ|文鳥|フクロウ|ニワトリ|ヒヨコ|スズメ/],
+  ["植物・きのこ",   /植物|きのこ|花|草|苔|盆栽|多肉|サボテン|ハーブ/],
+  ["自然・科学",     /鉱物|宇宙|天体|星|月|天気|雲|化石|恐竜|元素|科学|昆虫?標本/],
+  ["生き物（陸）",   /猫|犬|パンダ|昆虫|虫|爬虫類|カエル|ヘビ|トカゲ|ハムスター|うさぎ|リス|クマ|動物/],
+  ["乗り物・建物",   /乗り物|電車|車|飛行機|船|建築|建物|世界遺産|城|神社|寺/],
+  ["文化・芸術",     /エジプト|芸術|美術|絵画|縄文|古墳|博物館|楽器|文房具|切手|骨董|レトロ|妖怪|神話/],
+];
+
+function guessCategory(theme) {
+  for (const [cat, re] of CATEGORY_HINTS) if (re.test(theme)) return cat;
+  return "その他";
+}
+
+function rebuildFromOfficial() {
+  const status = document.getElementById("rebuildStatus");
+  if (!officialCatalog.length) {
+    status.textContent = "公式カタログが読み込まれていません（公開ページで開いているか確認してください）。";
+    return;
+  }
+  if (!confirm(
+    "楽天などから取得した画像・参考価格をクリアし、公式ショップのラインナップに合わせて図鑑を再構築します。\n" +
+    "所持記録・購入情報・写真・メモは保持されます。よろしいですか？")) return;
+
+  // 公式ラインナップのテーマ一覧（テーマ名＋シリーズ）
+  const officialKeys = new Set();
+  const officialEntries = [];
+  for (const c of officialCatalog) {
+    const p = parseThemeFromItemName(c.name);
+    if (!p) continue;
+    const key = p.series + "|" + p.theme;
+    if (officialKeys.has(key)) continue;
+    officialKeys.add(key);
+    officialEntries.push({ ...p, url: c.url, image: c.image });
+  }
+
+  // 1) 取得情報（楽天画像・参考価格）のクリア
+  let cleared = 0;
+  for (const i of state.items) {
+    if (i.imageUrl || i.market) cleared++;
+    i.imageUrl = "";
+    i.market = null;
+  }
+
+  // 2) ノイズ削除: 自動追加テーマのうち、公式に無く所持記録等も無いもの
+  const before = state.items.length;
+  state.items = state.items.filter(i => {
+    if (!i.id.startsWith("user_")) return true;
+    if (i.owned || i.photo || i.purchaseDate || i.memo) return true;
+    return officialKeys.has((i.series || "") + "|" + i.name.normalize("NFKC"));
+  });
+  const removed = before - state.items.length;
+
+  // 3) 公式にあって図鑑に無いテーマを追加
+  let added = 0;
+  for (const e of officialEntries) {
+    if (themeExists(e.theme, e.series)) continue;
+    state.items.push({
+      id: "user_" + Date.now() + "_" + (added++),
+      name: e.theme, series: e.series, category: guessCategory(e.theme),
+      emoji: "📔", desc: "", owned: false, count: 0, photo: null,
+      imageUrl: "", officialUrl: e.url, market: null,
+      purchaseDate: "", price: null, store: "", memo: "",
+    });
+  }
+
+  applyOfficialImages();
+  save();
+  render();
+  status.textContent =
+    `再構築しました: 取得情報のクリア${cleared}件・ノイズ削除${removed}件・公式ラインナップから追加${added}件。` +
+    "画像はすべて公式ショップのものが表示されます。";
+}
+
+/* ============================================================
  * 書き出し / 読み込み
  * ============================================================ */
 function exportData() {
@@ -1335,6 +1425,7 @@ document.getElementById("btnBulk").addEventListener("click", bulkFetch);
 document.getElementById("btnTestApi").addEventListener("click", testApi);
 document.getElementById("btnDiscover").addEventListener("click", discoverThemes);
 document.getElementById("btnDiscoverOfficial").addEventListener("click", discoverFromOfficial);
+document.getElementById("btnRebuildOfficial").addEventListener("click", rebuildFromOfficial);
 document.getElementById("btnAddDiscovered").addEventListener("click", addDiscovered);
 document.getElementById("discoverResults").addEventListener("click", e => {
   const el = e.target.closest("[data-disc]");
