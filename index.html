@@ -376,9 +376,11 @@
       で無料のアプリIDを発行し、下に貼り付けてください（このブラウザ内にのみ保存されます）。
     </div>
     <div class="form-row">
-      <label>楽天アプリID（applicationId）</label>
+      <label>楽天アプリID（applicationId・数字のみ）</label>
       <input type="text" id="fAppId" placeholder="例: 1000000000000000000" autocomplete="off">
     </div>
+    <button class="btn" id="btnTestApi">接続テスト</button>
+    <div class="rk-status" id="testStatus"></div>
 
     <div class="section-label">画像の一括取得</div>
     <div class="help-text">
@@ -567,8 +569,15 @@ function jsonp(url) {
   });
 }
 
+// アプリIDは数字のみ。全角数字・空白・記号の混入をここで吸収する
+function normalizeAppId(v) {
+  return String(v || "")
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/\D/g, "");
+}
+
 async function rakutenSearch(keyword) {
-  const appId = (state.settings.rakutenAppId || "").trim();
+  const appId = normalizeAppId(state.settings.rakutenAppId);
   if (!appId) throw new Error("NO_APP_ID");
   const url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601" +
     "?applicationId=" + encodeURIComponent(appId) +
@@ -576,8 +585,11 @@ async function rakutenSearch(keyword) {
     "&hits=8&imageFlag=1&formatVersion=2&format=json";
   const res = await jsonp(url);
   if (res.error) {
-    throw new Error(res.error === "wrong_parameter" && /applicationId/.test(res.error_description || "")
-      ? "アプリIDが正しくありません" : (res.error_description || res.error));
+    const desc = res.error_description || res.error;
+    if (res.error === "wrong_parameter" && /applicationId/i.test(desc)) {
+      throw new Error("アプリIDが正しくありません。楽天ウェブサービスの管理画面で「アプリID」（数字のみの値）を確認してください。発行直後は使えるまで数分かかることがあります。（API応答: " + desc + "）");
+    }
+    throw new Error(desc);
   }
   return (res.Items || []).map(it => ({
     name: it.itemName,
@@ -927,16 +939,31 @@ function openSettings() {
 }
 function closeSettings() { if (!bulkRunning) settingsBackdrop.classList.remove("open"); }
 function saveSettings() {
-  state.settings.rakutenAppId = document.getElementById("fAppId").value.trim();
+  state.settings.rakutenAppId = normalizeAppId(document.getElementById("fAppId").value);
   save();
   closeSettings();
+}
+
+async function testApi() {
+  const status = document.getElementById("testStatus");
+  state.settings.rakutenAppId = normalizeAppId(document.getElementById("fAppId").value);
+  save();
+  document.getElementById("fAppId").value = state.settings.rakutenAppId;
+  if (!state.settings.rakutenAppId) { status.textContent = "アプリIDを入力してください。"; return; }
+  status.textContent = "接続テスト中…";
+  try {
+    const results = await rakutenSearch("大人の図鑑シール");
+    status.textContent = `✅ 接続OK！ ${results.length}件の商品が見つかりました（例: ${results[0] ? results[0].name.slice(0, 30) : "-"}…）`;
+  } catch (e) {
+    status.textContent = "❌ " + e.message;
+  }
 }
 
 async function bulkFetch() {
   if (bulkRunning) { bulkRunning = false; return; }
   const status = document.getElementById("bulkStatus");
   // フォームのIDを未保存でも使えるよう先に反映
-  state.settings.rakutenAppId = document.getElementById("fAppId").value.trim();
+  state.settings.rakutenAppId = normalizeAppId(document.getElementById("fAppId").value);
   save();
   if (!state.settings.rakutenAppId) { status.textContent = "先に楽天アプリIDを入力してください。"; return; }
 
@@ -1051,6 +1078,7 @@ document.getElementById("btnSettings").addEventListener("click", openSettings);
 document.getElementById("btnSettingsClose").addEventListener("click", closeSettings);
 document.getElementById("btnSettingsSave").addEventListener("click", saveSettings);
 document.getElementById("btnBulk").addEventListener("click", bulkFetch);
+document.getElementById("btnTestApi").addEventListener("click", testApi);
 document.getElementById("btnRakuten").addEventListener("click", fetchRakutenCandidates);
 document.getElementById("rkResults").addEventListener("click", e => {
   const el = e.target.closest("[data-rk]");
