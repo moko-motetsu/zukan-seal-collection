@@ -764,12 +764,33 @@ function coverImgTag(i) {
 let officialCatalog = [];
 
 function applyOfficialImages() {
+  // 公式ショップは3D版・Premium版などを「1商品ページでテーマを選ぶ」形式で
+  // 販売しており、テーマ別の商品名・画像が一覧から取得できない（通常版の
+  // ような個別ページが無い）。そのため series まで完全一致する画像が
+  // 無い場合は、同じテーマ名の通常版画像を参考として表示する
+  // （実物の見た目・箔押し等とは異なる場合がある）。
+  const bySeriesTheme = new Map();
+  const normalByTheme = new Map();
   for (const c of officialCatalog) {
     const p = parseThemeFromItemName(c.name);
     if (!p) continue;
-    const it = state.items.find(i =>
-      i.name.normalize("NFKC") === p.theme && (i.series || "") === p.series);
-    if (it) { it.officialImage = c.image; it.officialUrl = c.url; }
+    const key = p.series + "|" + p.theme;
+    if (!bySeriesTheme.has(key)) bySeriesTheme.set(key, { image: c.image, url: c.url });
+    if (!p.series && !normalByTheme.has(p.theme)) normalByTheme.set(p.theme, { image: c.image, url: c.url });
+  }
+  for (const i of state.items) {
+    const theme = i.name.normalize("NFKC");
+    const exact = bySeriesTheme.get((i.series || "") + "|" + theme);
+    if (exact) {
+      i.officialImage = exact.image; i.officialUrl = exact.url; i.officialImageIsFallback = false;
+      continue;
+    }
+    if (i.series) {
+      const fallback = normalByTheme.get(theme);
+      if (fallback) {
+        i.officialImage = fallback.image; i.officialUrl = fallback.url; i.officialImageIsFallback = true;
+      }
+    }
   }
 }
 
@@ -947,7 +968,9 @@ function renderPhotoArea(i) {
   } else {
     img = `<span>📔</span>`;
   }
-  el.innerHTML = img +
+  const fallbackNote = (!photo && !i?.imageUrl && i?.officialImage && i?.officialImageIsFallback)
+    ? `<span class="photo-hint" style="right:auto;left:6px">※通常版の参考画像です</span>` : "";
+  el.innerHTML = img + fallbackNote +
     `<span class="photo-hint">📷 タップして写真を${photo ? "変更" : "登録"}</span>`;
 }
 
