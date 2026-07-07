@@ -1392,13 +1392,19 @@ async function rebuildFromOfficial() {
     "公式ショップの画像・ラインナップを正として図鑑を再構築します。\n" +
     "所持記録・購入情報・メモは保持されます。よろしいですか？")) return;
 
-  // 公式ラインナップのテーマ一覧（テーマ名＋シリーズ）
+  // 公式ラインナップのテーマ一覧（テーマ名＋シリーズ）。公式ショップは
+  // Premium版・3D版・ミニ版を「1商品ページでテーマを選ぶ」形式で販売しており、
+  // 一覧からはテーマ別の商品名・画像を取得できない（常に series="" になる）。
+  // そのため officialThemesAny には「シリーズを問わずテーマ名だけ」も別途集め、
+  // Premium/3D/ミニのアイテムが「公式に存在しない」と誤判定されないようにする。
   const officialKeys = new Set();
+  const officialThemesAny = new Set();
   const officialEntries = [];
   for (const c of officialCatalog) {
     const p = parseThemeFromItemName(c.name);
     if (!p) continue;
     const key = p.series + "|" + p.theme;
+    officialThemesAny.add(p.theme);
     if (officialKeys.has(key)) continue;
     officialKeys.add(key);
     officialEntries.push({ ...p, url: c.url, image: c.image });
@@ -1406,14 +1412,18 @@ async function rebuildFromOfficial() {
 
   // 1) 公式カタログを正にする: 公式に存在せず、所持記録等も無い項目は
   //    出どころ（初期収録の手作りテーマか、自動追加テーマか）を問わず削除する。
+  //    Premium/3D/ミニ版は、同じテーマ名の通常版が公式に実在すれば
+  //    （個別のシリーズ別画像は無くても）実在する商品として保持する。
   //    所持記録がある項目は、公式の表記と一致しなくても保護のため残す（要確認としてリストアップ）。
   //    ※ここでの判定は次の画像クリア（写真も含む）より前に行い、
   //      「写真を登録していたから残っていた」項目の扱いが画像クリアで変わらないようにする。
   const before = state.items.length;
   const orphans = [];
   state.items = state.items.filter(i => {
-    const key = (i.series || "") + "|" + i.name.normalize("NFKC");
+    const theme = i.name.normalize("NFKC");
+    const key = (i.series || "") + "|" + theme;
     if (officialKeys.has(key)) return true;
+    if (i.series && officialThemesAny.has(theme)) return true;
     const hasRecord = i.owned || i.photo || i.purchaseDate || i.memo || i.price != null || i.store;
     if (hasRecord) { orphans.push(i.name + (i.series ? "（" + i.series + "）" : "")); return true; }
     return false;
@@ -1443,6 +1453,22 @@ async function rebuildFromOfficial() {
     });
   }
 
+  // 4) Premium/3D/ミニ版のSEEDテーマを復元する。以前のバージョンでは
+  //    「シリーズ完全一致」でしか公式実在を判定できなかったため、これらは
+  //    誤って削除され、officialSourceOfTruthフラグにより再読み込みでも
+  //    復活しなくなっていた。対応する通常版テーマが公式に実在するものに限り、
+  //    まだ図鑑に無ければここで復元する。
+  let restored = 0;
+  for (const seed of SEED) {
+    if (!seed.series) continue;
+    const theme = seed.name.normalize("NFKC");
+    if (!officialThemesAny.has(theme)) continue;
+    if (themeExists(seed.name, seed.series)) continue;
+    state.items.push({ ...seed, owned: false, count: 0, photo: null,
+      purchaseDate: "", price: null, store: "", memo: "" });
+    restored++;
+  }
+
   const beforeDedup = state.items.length;
   state.items = dedupeItems(state.items);
   const merged = beforeDedup - state.items.length;
@@ -1457,8 +1483,9 @@ async function rebuildFromOfficial() {
     ? ` ⚠ 所持記録があり公式カタログの表記と一致しなかったため保持: ${orphans.slice(0, 8).join("、")}${orphans.length > 8 ? " ほか" + (orphans.length - 8) + "件" : ""}（テーマ名を公式表記に手直しすると統合できます）`
     : "";
   const mergedNote = merged ? `・重複統合${merged}件（過去の再構築で残った重複を1件にまとめました）` : "";
+  const restoredNote = restored ? `・Premium/3D/ミニ版${restored}件を復元` : "";
   status.textContent =
-    `再構築しました: 取得情報のクリア${cleared}件・削除${removed}件・公式ラインナップから追加${added}件${mergedNote}・合計${state.items.length}件（公式${officialEntries.length}件）。` +
+    `再構築しました: 取得情報のクリア${cleared}件・削除${removed}件・公式ラインナップから追加${added}件${restoredNote}${mergedNote}・合計${state.items.length}件（公式${officialEntries.length}件）。` +
     "画像はすべて公式ショップのものが表示されます。" + orphanNote;
 }
 
