@@ -552,19 +552,56 @@ function s(name, category, emoji, desc, series) {
  * ============================================================ */
 const STORE_KEY = "zukanSealCollection_v1";
 
+// 同じテーマ（series+name）を指す項目が複数できてしまった場合に1件へ統合する。
+// パーサーの改良やSEEDの表記修正を経て複数回「再構築」を実行すると、
+// 過去バージョンが作った微妙に違う名前の項目が積み残ることがあるため、
+// 起動のたびに自動で片付ける（何度再構築してもこの状態に収束する＝冪等にする）。
+function dedupeItems(items) {
+  const groups = new Map();
+  for (const i of items) {
+    const key = (i.series || "") + "|" + i.name.normalize("NFKC");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(i);
+  }
+  const hasRecord = i => i.owned || i.photo || i.purchaseDate || i.memo || i.price != null || i.store;
+  const out = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) { out.push(group[0]); continue; }
+    const primary = group.find(hasRecord) || group[0];
+    for (const other of group) {
+      if (other === primary) continue;
+      primary.officialImage = primary.officialImage || other.officialImage;
+      primary.officialUrl = primary.officialUrl || other.officialUrl;
+      primary.imageUrl = primary.imageUrl || other.imageUrl;
+      primary.market = primary.market || other.market;
+      primary.desc = primary.desc || other.desc;
+    }
+    out.push(primary);
+  }
+  return out;
+}
+
 function load() {
   let data;
   try { data = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { data = null; }
   if (!data || !Array.isArray(data.items)) data = { items: [] };
   if (!data.settings || typeof data.settings !== "object") data.settings = {};
-  // シードにあってデータに無いテーマを追記（アプリ更新で新テーマが増えた場合）
+  // シードにあってデータに無いテーマを追記（アプリ更新で新テーマが増えた場合）。
+  // idだけでなく名前（series+name）でも既存判定する。理由: 「公式情報を正として
+  // 再構築」がSEED由来の項目を削除し公式表記の項目を user_ 接頭辞で作り直すことが
+  // あるため、その後SEED側の表記だけを直しても id は一致せず、名前基準の判定が
+  // 無いと同じテーマが seed_ と user_ の二重に増殖してしまう。
   const ids = new Set(data.items.map(i => i.id));
+  const existingKeys = new Set(data.items.map(i => (i.series || "") + "|" + i.name.normalize("NFKC")));
   for (const seed of SEED) {
-    if (!ids.has(seed.id)) {
+    const key = (seed.series || "") + "|" + seed.name.normalize("NFKC");
+    if (!ids.has(seed.id) && !existingKeys.has(key)) {
       data.items.push({ ...seed, owned: false, count: 0, photo: null,
         purchaseDate: "", price: null, store: "", memo: "" });
+      existingKeys.add(key);
     }
   }
+  data.items = dedupeItems(data.items);
   return data;
 }
 
@@ -1359,14 +1396,18 @@ async function rebuildFromOfficial() {
     });
   }
 
+  const beforeDedup = state.items.length;
+  state.items = dedupeItems(state.items);
+  const merged = beforeDedup - state.items.length;
   applyOfficialImages();
   save();
   render();
   const orphanNote = orphans.length
     ? ` ⚠ 所持記録があり公式カタログの表記と一致しなかったため保持: ${orphans.slice(0, 8).join("、")}${orphans.length > 8 ? " ほか" + (orphans.length - 8) + "件" : ""}（テーマ名を公式表記に手直しすると統合できます）`
     : "";
+  const mergedNote = merged ? `・重複統合${merged}件（過去の再構築で残った重複を1件にまとめました）` : "";
   status.textContent =
-    `再構築しました: 取得情報のクリア${cleared}件・削除${removed}件・公式ラインナップから追加${added}件・合計${state.items.length}件（公式${officialEntries.length}件）。` +
+    `再構築しました: 取得情報のクリア${cleared}件・削除${removed}件・公式ラインナップから追加${added}件${mergedNote}・合計${state.items.length}件（公式${officialEntries.length}件）。` +
     "画像はすべて公式ショップのものが表示されます。" + orphanNote;
 }
 
