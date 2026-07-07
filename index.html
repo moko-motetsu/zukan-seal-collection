@@ -629,6 +629,16 @@ function esc(str) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// 通販/公式サイトの商品画像は、ブラウザがHTMLの<img>埋め込みを検知して
+// ホットリンク対策でブロックすることがある（ブラウザで直接開くと表示できるのに
+// アプリ内では読み込めない、というケースの原因）。wsrv.nl（旧images.weserv.nl）の
+// 無料画像プロキシをサーバー側の取得役として挟むことで、埋め込み表示でも
+// 安定して読み込めるようにする。data:（自分の写真・生成カバー）は素通しする。
+function proxiedImage(url) {
+  if (!url || url.startsWith("data:")) return url;
+  return "https://wsrv.nl/?url=" + encodeURIComponent(url);
+}
+
 /* ============================================================
  * 概要画像
  * 優先順: 自分の写真 > 商品画像URL > 自動生成の図鑑風カバー
@@ -741,7 +751,7 @@ function coverImgTag(i) {
   // 通販/公式サイトの画像を参照表示（読み込めない場合は図鑑風カバーに自動フォールバック）
   const ref = i.imageUrl || i.officialImage;
   if (ref) {
-    return `<img src="${esc(ref)}" alt="${esc(i.name)}" referrerpolicy="no-referrer" data-fallback-id="${esc(i.id)}">`;
+    return `<img src="${esc(proxiedImage(ref))}" alt="${esc(i.name)}" data-fallback-id="${esc(i.id)}">`;
   }
   return `<img src="${coverSvg(i)}" alt="${esc(i.name)}">`;
 }
@@ -931,7 +941,7 @@ function renderPhotoArea(i) {
   if (photo) {
     img = `<img src="${photo}" alt="">`;
   } else if (ref) {
-    img = `<img src="${esc(ref)}" alt="" referrerpolicy="no-referrer" data-fallback-id="${esc(i.id)}">`;
+    img = `<img src="${esc(proxiedImage(ref))}" alt="" data-fallback-id="${esc(i.id)}">`;
   } else if (i) {
     img = `<img src="${coverSvg(i)}" alt="">`;
   } else {
@@ -963,7 +973,7 @@ async function fetchRakutenCandidates() {
     status.textContent = "使いたい商品をタップしてください:";
     box.innerHTML = results.map((r, idx) => `
       <div class="rk-item" data-rk="${idx}">
-        <img src="${esc(r.image)}" alt="" referrerpolicy="no-referrer">
+        <img src="${esc(proxiedImage(r.image))}" alt="">
         <div class="rk-name">${esc(r.name)}</div>
         <div class="rk-price">${yen(r.price)}</div>
       </div>`).join("");
@@ -988,7 +998,7 @@ function pickRakutenCandidate(idx) {
   renderMarketInfo(pendingMarket);
   // プレビューを即時更新（読み込み失敗時はカバー画像へ）
   document.getElementById("mPhoto").innerHTML =
-    `<img src="${esc(r.image)}" alt="" referrerpolicy="no-referrer"
+    `<img src="${esc(proxiedImage(r.image))}" alt=""
           ${editingId ? `data-fallback-id="${esc(editingId)}"` : ""}>
      <span class="photo-hint">📷 タップして写真を登録</span>`;
   document.getElementById("rkStatus").textContent = "取り込みました。「保存」で確定します。";
@@ -1255,7 +1265,7 @@ async function discoverThemes() {
   status.textContent = `${discovered.length}件の未収録テーマが見つかりました。追加したいものをタップして選択:`;
   box.innerHTML = discovered.map((d, idx) => `
     <div class="rk-item selected" data-disc="${idx}">
-      <img src="${esc(d.image)}" alt="" referrerpolicy="no-referrer">
+      <img src="${esc(proxiedImage(d.image))}" alt="">
       <div class="rk-name">${esc(d.theme)}${d.series ? "（" + esc(d.series) + "）" : ""}</div>
       <div class="rk-price">${yen(d.price)}</div>
     </div>`).join("");
@@ -1293,7 +1303,7 @@ async function discoverFromOfficial() {
   status.textContent = `${discovered.length}件の未収録テーマが見つかりました。追加したいものをタップで選択:`;
   box.innerHTML = discovered.map((d, idx) => `
     <div class="rk-item selected" data-disc="${idx}">
-      <img src="${esc(d.image)}" alt="" referrerpolicy="no-referrer">
+      <img src="${esc(proxiedImage(d.image))}" alt="">
       <div class="rk-name">${esc(d.theme)}${d.series ? "（" + esc(d.series) + "）" : ""}</div>
       <div class="rk-price">${d.price ? yen(d.price) : "公式"}</div>
     </div>`).join("");
