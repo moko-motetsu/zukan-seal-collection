@@ -421,9 +421,11 @@
 
     <div class="section-label">公式カタログを正にする</div>
     <div class="help-text">
-      楽天などから取得した画像・参考価格をすべてクリアし、カミオジャパン公式ショップの
-      ラインナップに合わせて図鑑を再構築します。<b>所持記録・購入情報・自分で撮った写真・メモは保持されます。</b>
-      自動追加されたテーマのうち、公式に存在せず所持記録も無いもの（ノイズ）は削除されます。
+      楽天などから取得した画像・参考価格、<b>自分で登録した写真も含めてすべてクリア</b>し、
+      カミオジャパン公式ショップの画像・ラインナップを正として図鑑を再構築します。
+      <b>所持記録・購入情報・メモは保持されます。</b>
+      公式に存在せず所持記録も無いテーマ（ノイズ）は削除されます。
+      一度実行すると、以後は公式カタログが情報源になります（初期収録テーマの自動追記は行われなくなります）。
     </div>
     <button class="btn danger" id="btnRebuildOfficial">公式情報を正として再構築</button>
     <div class="rk-status" id="rebuildStatus"></div>
@@ -587,18 +589,25 @@ function load() {
   if (!data || !Array.isArray(data.items)) data = { items: [] };
   if (!data.settings || typeof data.settings !== "object") data.settings = {};
   // シードにあってデータに無いテーマを追記（アプリ更新で新テーマが増えた場合）。
-  // idだけでなく名前（series+name）でも既存判定する。理由: 「公式情報を正として
-  // 再構築」がSEED由来の項目を削除し公式表記の項目を user_ 接頭辞で作り直すことが
-  // あるため、その後SEED側の表記だけを直しても id は一致せず、名前基準の判定が
-  // 無いと同じテーマが seed_ と user_ の二重に増殖してしまう。
-  const ids = new Set(data.items.map(i => i.id));
-  const existingKeys = new Set(data.items.map(i => (i.series || "") + "|" + i.name.normalize("NFKC")));
-  for (const seed of SEED) {
-    const key = (seed.series || "") + "|" + seed.name.normalize("NFKC");
-    if (!ids.has(seed.id) && !existingKeys.has(key)) {
-      data.items.push({ ...seed, owned: false, count: 0, photo: null,
-        purchaseDate: "", price: null, store: "", memo: "" });
-      existingKeys.add(key);
+  // ただし「公式情報を正として再構築」を一度実行した後は、公式カタログが
+  // 正であり手作業の初期収録（SEED）はもう情報源として使わない。ここで
+  // 追記を続けると、再構築が削除した「公式に存在しないテーマ」が次に
+  // ページを開くたびにSEEDから復活してしまう（再構築の結果が定着しない
+  // 不具合の原因だった）ため、フラグが立っていればSEED追記を行わない。
+  if (!data.settings.officialSourceOfTruth) {
+    // idだけでなく名前（series+name）でも既存判定する。理由: 再構築がSEED由来の
+    // 項目を削除し公式表記の項目を user_ 接頭辞で作り直すことがあるため、
+    // その後SEED側の表記だけを直しても id は一致せず、名前基準の判定が
+    // 無いと同じテーマが seed_ と user_ の二重に増殖してしまう。
+    const ids = new Set(data.items.map(i => i.id));
+    const existingKeys = new Set(data.items.map(i => (i.series || "") + "|" + i.name.normalize("NFKC")));
+    for (const seed of SEED) {
+      const key = (seed.series || "") + "|" + seed.name.normalize("NFKC");
+      if (!ids.has(seed.id) && !existingKeys.has(key)) {
+        data.items.push({ ...seed, owned: false, count: 0, photo: null,
+          purchaseDate: "", price: null, store: "", memo: "" });
+        existingKeys.add(key);
+      }
     }
   }
   data.items = dedupeItems(data.items);
@@ -1346,8 +1355,9 @@ async function rebuildFromOfficial() {
     return;
   }
   if (!confirm(
-    "楽天などから取得した画像・参考価格をクリアし、公式ショップのラインナップに合わせて図鑑を再構築します。\n" +
-    "所持記録・購入情報・写真・メモは保持されます。よろしいですか？")) return;
+    "楽天などから取得した画像・参考価格、および自分で登録した写真をすべてクリアし、\n" +
+    "公式ショップの画像・ラインナップを正として図鑑を再構築します。\n" +
+    "所持記録・購入情報・メモは保持されます。よろしいですか？")) return;
 
   // 公式ラインナップのテーマ一覧（テーマ名＋シリーズ）
   const officialKeys = new Set();
@@ -1361,17 +1371,11 @@ async function rebuildFromOfficial() {
     officialEntries.push({ ...p, url: c.url, image: c.image });
   }
 
-  // 1) 取得情報（楽天画像・参考価格）のクリア
-  let cleared = 0;
-  for (const i of state.items) {
-    if (i.imageUrl || i.market) cleared++;
-    i.imageUrl = "";
-    i.market = null;
-  }
-
-  // 2) 公式カタログを正にする: 公式に存在せず、所持記録等も無い項目は
+  // 1) 公式カタログを正にする: 公式に存在せず、所持記録等も無い項目は
   //    出どころ（初期収録の手作りテーマか、自動追加テーマか）を問わず削除する。
   //    所持記録がある項目は、公式の表記と一致しなくても保護のため残す（要確認としてリストアップ）。
+  //    ※ここでの判定は次の画像クリア（写真も含む）より前に行い、
+  //      「写真を登録していたから残っていた」項目の扱いが画像クリアで変わらないようにする。
   const before = state.items.length;
   const orphans = [];
   state.items = state.items.filter(i => {
@@ -1382,6 +1386,16 @@ async function rebuildFromOfficial() {
     return false;
   });
   const removed = before - state.items.length;
+
+  // 2) 取得情報（楽天画像・参考価格）と自分で登録した写真をすべてクリアし、
+  //    以後は公式ショップの画像だけを表示する（officialImageに一本化）。
+  let cleared = 0;
+  for (const i of state.items) {
+    if (i.imageUrl || i.market || i.photo) cleared++;
+    i.imageUrl = "";
+    i.market = null;
+    i.photo = null;
+  }
 
   // 3) 公式にあって図鑑に無いテーマを追加
   let added = 0;
@@ -1399,6 +1413,10 @@ async function rebuildFromOfficial() {
   const beforeDedup = state.items.length;
   state.items = dedupeItems(state.items);
   const merged = beforeDedup - state.items.length;
+  // 以後、手作業の初期収録（SEED）をページ読み込みのたびに追記するのをやめる。
+  // これをしないと、公式に無いため今まさに削除したテーマが次にページを
+  // 開いた瞬間にSEEDから復活し、再構築の結果が定着しなくなる。
+  state.settings.officialSourceOfTruth = true;
   applyOfficialImages();
   save();
   render();
