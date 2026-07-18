@@ -40,6 +40,39 @@
 - **統計ダッシュボード** — コンプリート率、カテゴリ別の収集進捗、購入金額合計を自動集計。
 - **検索・並べ替え** — 名前検索、所持状況フィルタ、図鑑順／名前順／購入日順／価格順の並べ替え。
 - **バックアップ** — JSON形式で書き出し／読み込み（写真も含めて機種変更時に引っ越しできます）。
+- **スマホへの新着・在庫復活通知（[ntfy](https://ntfy.sh/)連携）** — GitHub Actionsが裏で
+  常時監視し、[ntfy](https://ntfy.sh/)アプリ経由でiPhone/Androidにプッシュ通知します。
+  1. `zukan-watch/check_new_items.mjs`（1時間毎） — 楽天市場に新商品が並んだら通知
+  2. `zukan-watch/check_stock.mjs`（下記参照） — カミオジャパン公式ショップで
+     「品切れ」だった商品が購入可能になった瞬間に、購入リンク付きで通知
+
+  必要なリポジトリシークレット（GitHubの Settings → Secrets and variables → Actions）:
+  `RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY`（楽天ウォッチ用）、`NTFY_TOPIC`（両方で共通）。
+  ntfyアプリで購読したトピック名を`NTFY_TOPIC`に設定してください。
+
+  ### 在庫復活通知を5分間隔で確実に動かす（外部cron連携）
+
+  GitHub純正の`schedule`実行は、5分間隔を指定しても負荷状況により
+  数十分〜1時間単位に間引かれることがある**既知の制限**です（保証外の挙動）。
+  確実に短い間隔で動かしたい場合は、無料の外部cronサービスから
+  [`repository_dispatch`](https://docs.github.com/ja/actions/using-workflows/events-that-trigger-workflows#repository_dispatch)
+  イベントを送る方式にしてください（`watch_official_stock.yml`は両対応済み）。
+
+  1. [cron-job.org](https://cron-job.org/) 等の無料アカウントを作成
+  2. GitHubで [Fine-grained personal access token](https://github.com/settings/personal-access-tokens/new) を発行
+     （Repository access: このリポジトリのみ／Permissions: **Contents: Read and write**）
+  3. cron-job.orgで新しいジョブを作成:
+     - URL: `https://api.github.com/repos/<owner>/<repo>/dispatches`
+     - Method: `POST`
+     - 実行間隔: 5分ごと
+     - Headers:
+       - `Authorization: Bearer <発行したトークン>`
+       - `Accept: application/vnd.github+json`
+       - `Content-Type: application/json`
+     - Body: `{"event_type":"stock-check"}`
+
+  ※このトークンは外部サービスに預けることになるため、対象リポジトリだけ・
+  必要最小限の権限に絞り、定期的に失効/再発行することをおすすめします。
 
 ## 使い方
 
