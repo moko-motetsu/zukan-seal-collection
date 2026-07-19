@@ -44,7 +44,7 @@
   常時監視し、[ntfy](https://ntfy.sh/)アプリ経由でiPhone/Androidにプッシュ通知します。
   1. `zukan-watch/check_new_items.mjs`（1時間毎） — 楽天市場に新商品が並んだら通知
   2. `zukan-watch/check_stock.mjs`（下記参照） — **カミオジャパン公式ショップ・
-     LOFTネットストア・東急ハンズネットストア・PLAZAオンラインストア・
+     LOFTネットストア・PLAZAオンラインストア・
      キデイランド（Yahoo!ショッピング店舗・原宿店/通常店）**（いずれも定価販売）
      を横断で巡回し、「品切れ」だった商品が購入可能になった瞬間に、
      店名・購入リンク付きで通知
@@ -53,12 +53,12 @@
   `RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY`（楽天ウォッチ用）、`NTFY_TOPIC`（両方で共通）。
   ntfyアプリで購読したトピック名を`NTFY_TOPIC`に設定してください。
 
-  ※ヨドバシ.comも取得コード（`zukan-watch/shops.mjs`の`fetchYodobashi`）は
-  用意していますが、実運用で確認したところボット対策（WAF等）により常に
-  `HTTP 403`でブロックされ取得できませんでした。ブラウザ相当のヘッダーを
-  付けても突破できなかったため、これ以上の回避（高度なヘッダー偽装等）は
-  行わない方針とし、現状は取得失敗として扱っています（ログに記録されるのみで、
-  他店舗の監視には影響しません）。
+  ※**ヨドバシ.com・東急ハンズ**は、robots.txtを含む全ページがクラウド
+  （GitHub Actions）のIPからは常に`HTTP 403`でブロックされることを実測で
+  確認したため、Actionsからの巡回対象には含めていません（取得コードは
+  `zukan-watch/shops.mjs`に残置）。この2サイトは商品単位で
+  **iPhoneショートカットによる自動チェック**で代替します —
+  手順は [`zukan-watch/iphone_shortcut_guide.md`](../zukan-watch/iphone_shortcut_guide.md) 参照。
   他の大型サイトも同様に、将来ページ構造の変更やアクセス制限で
   一時的に取得できなくなる可能性があります（1店舗の失敗は他店舗の
   監視を止めません）。
