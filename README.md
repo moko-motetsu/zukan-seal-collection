@@ -43,12 +43,17 @@
 - **スマホへの新着・在庫復活通知（[ntfy](https://ntfy.sh/)連携）** — GitHub Actionsが裏で
   常時監視し、[ntfy](https://ntfy.sh/)アプリ経由でiPhone/Androidにプッシュ通知します。
   1. `zukan-watch/check_new_items.mjs`（1時間毎） — 楽天市場に新商品が並んだら通知
-  2. `zukan-watch/check_stock.mjs`（下記参照） — カミオジャパン公式ショップで
-     「品切れ」だった商品が購入可能になった瞬間に、購入リンク付きで通知
+  2. `zukan-watch/check_stock.mjs`（下記参照） — **カミオジャパン公式ショップ・
+     ヨドバシ.com・LOFTネットストア**（いずれも定価販売）を横断で巡回し、
+     「品切れ」だった商品が購入可能になった瞬間に、店名・購入リンク付きで通知
 
   必要なリポジトリシークレット（GitHubの Settings → Secrets and variables → Actions）:
   `RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY`（楽天ウォッチ用）、`NTFY_TOPIC`（両方で共通）。
   ntfyアプリで購読したトピック名を`NTFY_TOPIC`に設定してください。
+
+  ※ヨドバシ.com・LOFTは大型サイトのためページ構造の変更やアクセス制限で
+  一時的に取得できなくなる可能性があります。その場合は該当ショップの取得だけ
+  失敗として扱い（ログに記録）、他ショップ・他機能の監視は継続します。
 
   ### 在庫復活通知を5分間隔で確実に動かす（外部cron連携）
 
