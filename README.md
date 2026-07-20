@@ -48,11 +48,13 @@
      キデイランド（Yahoo!ショッピング店舗・原宿店/通常店）**（いずれも定価販売）
      を横断で巡回し、「品切れ」だった商品が購入可能になった瞬間に、
      店名・購入リンク付きで通知
-  3. `zukan-watch/check_gunpla.mjs`（1時間毎＋外部cron連携可） —
-     **プレミアムバンダイのガンプラカテゴリ全体**を巡回し、売り切れだった
-     商品が購入可能になった瞬間に購入リンク付きで通知（図鑑シールとは独立の
-     ウォッチ。短い間隔にしたい場合はcron-job.orgから
-     `{"event_type":"gunpla-check"}` を送る — 下記の外部cron連携と同じ手順）
+  3. ～～プレミアムバンダイのガンプラ巡回～～ — 実装を試みたが、プレバンは
+     海外IP（GitHub Actionsのサーバー）からのアクセスを日本サイトではなく
+     海外向け案内ページにリダイレクトするため、クラウドからの巡回は不可能と
+     実測で確認（取得コードは`shops.mjs`の`fetchPBandaiGunpla`に残置）。
+     ガンプラの在庫・再販は **iPhoneショートカット（商品単位）** と
+     **プレバン公式の「入荷お知らせメール」** で監視する —
+     [`zukan-watch/iphone_shortcut_guide.md`](../zukan-watch/iphone_shortcut_guide.md) のPart 12参照
 
   必要なリポジトリシークレット（GitHubの Settings → Secrets and variables → Actions）:
   `RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY`（楽天ウォッチ用）、`NTFY_TOPIC`（両方で共通）。
