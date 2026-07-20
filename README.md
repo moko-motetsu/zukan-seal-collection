@@ -48,13 +48,19 @@
      キデイランド（Yahoo!ショッピング店舗・原宿店/通常店）**（いずれも定価販売）
      を横断で巡回し、「品切れ」だった商品が購入可能になった瞬間に、
      店名・購入リンク付きで通知
-  3. ～～プレミアムバンダイのガンプラ巡回～～ — 実装を試みたが、プレバンは
-     海外IP（GitHub Actionsのサーバー）からのアクセスを日本サイトではなく
-     海外向け案内ページにリダイレクトするため、クラウドからの巡回は不可能と
-     実測で確認（取得コードは`shops.mjs`の`fetchPBandaiGunpla`に残置）。
-     ガンプラの在庫・再販は **iPhoneショートカット（商品単位）** と
-     **プレバン公式の「入荷お知らせメール」** で監視する —
-     [`zukan-watch/iphone_shortcut_guide.md`](../zukan-watch/iphone_shortcut_guide.md) のPart 12参照
+  3. `zukan-watch/check_gunpla_schedule.mjs`（1時間毎） — **プレミアムバンダイの
+     ガンプラの予約/再販開始を事前通知**します。人気ガンプラは「再販後に通知
+     →即売り切れ」で間に合わないため、争奪戦になる前（予約受付が開いた早い
+     段階）に気づけるようにするのが狙いです。プレバン直接は海外IPで巡回不可の
+     ため、第三者集約サイト [GunplaDatabase](https://gunpla-database.doc-sin.life/)
+     の「プレバンで販売・再販・予約受付中の定価以下ガンプラ」一覧を使い、
+     新しく一覧に出現した商品（＝買えるようになった商品）を通知します。
+     - 特定シリーズだけ通知したい場合は、GitHubの Settings → Secrets and
+       variables → Actions → **Variables** に `GUNPLA_KEYWORDS` を作り、
+       商品名の一部をカンマ区切りで設定（例: `エアリアル,ナラティブ`）。未設定なら全件。
+     - ※プレバンのガンプラ在庫を直接・商品単位で見たい場合は、iPhoneショートカット
+       やプレバン公式アプリのフォロー通知も併用できます
+       （[`zukan-watch/iphone_shortcut_guide.md`](../zukan-watch/iphone_shortcut_guide.md) のPart 12・13参照）
 
   必要なリポジトリシークレット（GitHubの Settings → Secrets and variables → Actions）:
   `RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY`（楽天ウォッチ用）、`NTFY_TOPIC`（両方で共通）。
