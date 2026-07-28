@@ -450,6 +450,18 @@ const CATEGORIES = [
   "自然・科学", "食べ物", "飲み物", "乗り物・建物", "文化・芸術", "その他"
 ];
 
+// 公式カタログ（kamiojapan.jp/catalog）を「正」にすると、上の固定分類には
+// 無いカテゴリ（ライセンスキャラクター・都道府県・美術博物館 等）が入ってくる。
+// 実際に図鑑に存在するカテゴリを CATEGORIES の並び順を優先しつつ動的に返す。
+function allCategories() {
+  const base = CATEGORIES.slice();
+  const seen = new Set(base);
+  for (const i of state.items) {
+    if (i.category && !seen.has(i.category)) { seen.add(i.category); base.push(i.category); }
+  }
+  return base;
+}
+
 const SEED = [
   // --- 生き物（陸） ---
   s("動物園",            "生き物（陸）", "🦁", "ライオン・ゾウ・キリンなど動物園の人気者を図鑑風に収録"),
@@ -572,6 +584,7 @@ function dedupeItems(items) {
     const primary = group.find(hasRecord) || group[0];
     for (const other of group) {
       if (other === primary) continue;
+      primary.jan = primary.jan || other.jan;
       primary.officialImage = primary.officialImage || other.officialImage;
       primary.officialUrl = primary.officialUrl || other.officialUrl;
       primary.imageUrl = primary.imageUrl || other.imageUrl;
@@ -757,54 +770,166 @@ function coverImgTag(i) {
 }
 
 /* ============================================================
- * 公式カタログ（カミオジャパン公式ショップの商品名・画像URL一覧）
- * GitHub Actionsが週1回 official_catalog.json を生成する。
- * 画像は公式サーバーから参照表示するだけで、コピーは保存しない。
+ * 公式カタログ（カミオジャパンの全ラインナップ＝図鑑の「正」）
+ *
+ * official_catalog.json には2系統の形式があり得る:
+ *  - 新（推奨・マスタ）: 公式サイト kamiojapan.jp/catalog 由来。
+ *      {jan, name, releaseDate, image, category, categoryLabel, url}
+ *      name はテーマ名そのもの。全ラインナップが1ページに揃うため、これを
+ *      JANを一意キーとした「正」の図鑑マスタとして扱う。
+ *  - 旧（フォールバック）: 公式ショップ kamiojapan.shop 由来。
+ *      {name, url, image} で name に価格/在庫が付随。従来どおり
+ *      parseThemeFromItemName でテーマ名を抽出して画像だけ参照表示する。
+ *
+ * 取得元は Render 上の集約エンドポイント（新形式）を優先し、失敗時は
+ * リポジトリ同梱のローカル official_catalog.json（file://や到達不可時）に
+ * フォールバックする。画像は各サーバーから参照表示するだけで保存しない。
  * ============================================================ */
-let officialCatalog = [];
+const CATALOG_ENDPOINT = "https://nutrition-track.onrender.com/zukan/catalog";
+// マスタ再構築のスキーマ版。ロジックを変えて作り直しをやり直させたい時に上げる。
+const OFFICIAL_MASTER_VERSION = 1;
+
+let officialCatalog = [];   // 取得した生データ（products 配列）
+let officialEntries = [];   // 正規化済みエントリ {jan, theme, series, image, url, category, releaseDate}
+let officialIsNew = false;  // 新形式（公式サイトのマスタ）かどうか
+
+// 生の商品名/カテゴリを、形式差を吸収した共通エントリに正規化する。
+function looksLikeNewCatalog(products) {
+  return products.some(p => p && (p.jan || p.categoryLabel || p.category));
+}
+function cleanCategoryLabel(label) {
+  const s = String(label || "").trim();
+  // 空、または日本語化できず生の英語スラッグ（data-cat）のままの場合は「その他」に寄せる
+  if (!s || /^[\x00-\x7f]+$/.test(s)) return "その他";
+  return s;
+}
+function normalizeCatalog(products) {
+  const isNew = looksLikeNewCatalog(products);
+  const entries = [];
+  for (const c of products || []) {
+    if (isNew) {
+      const theme = String(c.name || "").normalize("NFKC").replace(/\s+/g, " ").trim();
+      const jan = String(c.jan || "").trim();
+      if (!theme && !jan) continue;
+      entries.push({
+        jan, theme, series: "",
+        image: c.image || "", url: c.url || "",
+        category: cleanCategoryLabel(c.categoryLabel || c.category),
+        releaseDate: c.releaseDate || "",
+      });
+    } else {
+      const p = parseThemeFromItemName(c.name);
+      if (!p) continue;
+      entries.push({ jan: "", theme: p.theme.normalize("NFKC"), series: p.series,
+        image: c.image || "", url: c.url || "", category: "", releaseDate: "" });
+    }
+  }
+  return { isNew, entries };
+}
 
 function applyOfficialImages() {
-  // 公式ショップは3D版・Premium版などを「1商品ページでテーマを選ぶ」形式で
-  // 販売しており、テーマ別の商品名・画像が一覧から取得できない（通常版の
-  // ような個別ページが無い）。そのため series まで完全一致する画像が
-  // 無い場合は、同じテーマ名の通常版画像を参考として表示する
-  // （実物の見た目・箔押し等とは異なる場合がある）。
-  const bySeriesTheme = new Map();
-  const normalByTheme = new Map();
-  for (const c of officialCatalog) {
-    const p = parseThemeFromItemName(c.name);
-    if (!p) continue;
-    const key = p.series + "|" + p.theme;
-    if (!bySeriesTheme.has(key)) bySeriesTheme.set(key, { image: c.image, url: c.url });
-    if (!p.series && !normalByTheme.has(p.theme)) normalByTheme.set(p.theme, { image: c.image, url: c.url });
+  // JAN優先、無ければテーマ名で公式エントリに突き合わせ、公式画像・URL・
+  // （新カタログなら）カテゴリを付与する。公式はテーマ単位の一覧なので、
+  // Premium/3D/ミニ等のシリーズ版には同名通常版の画像を「参考」として流用する。
+  const byJan = new Map();
+  const byTheme = new Map();
+  for (const e of officialEntries) {
+    if (e.jan && !byJan.has(e.jan)) byJan.set(e.jan, e);
+    if (!byTheme.has(e.theme)) byTheme.set(e.theme, e);
   }
   for (const i of state.items) {
-    const theme = i.name.normalize("NFKC");
-    const exact = bySeriesTheme.get((i.series || "") + "|" + theme);
-    if (exact) {
-      i.officialImage = exact.image; i.officialUrl = exact.url; i.officialImageIsFallback = false;
-      continue;
-    }
-    if (i.series) {
-      const fallback = normalByTheme.get(theme);
-      if (fallback) {
-        i.officialImage = fallback.image; i.officialUrl = fallback.url; i.officialImageIsFallback = true;
-      }
-    }
+    const e = (i.jan && byJan.get(i.jan)) || byTheme.get(i.name.normalize("NFKC"));
+    if (!e) continue;
+    if (e.jan && !i.jan) i.jan = e.jan;
+    i.officialImage = e.image;
+    i.officialUrl = e.url;
+    i.officialImageIsFallback = !!i.series; // シリーズ版は通常版画像の流用
   }
 }
 
-// 「公式ショップから検索」「公式情報を正として再構築」等は、ページ読み込み直後の
+// 新形式カタログを「正」として図鑑を一度だけ作り直す（冪等・破壊は最小限）。
+//  - 所持記録・購入情報・写真・メモは必ず保持する（絶対に消さない）。
+//  - 公式に無く記録も無い旧テーマ（SEED由来のノイズ等）だけ整理する。
+//  - 公式にあって図鑑に無いテーマを全件追加し、188件のラインナップを揃える。
+// 取得不良（件数が極端に少ない）や旧形式では作り直さない安全弁を入れる。
+function migrateToOfficialMaster() {
+  if (!officialIsNew) return false;
+  if (officialEntries.length < 50) return false;
+  if (state.settings.officialMasterVersion === OFFICIAL_MASTER_VERSION) return false;
+
+  const byJan = new Map();
+  const byTheme = new Map();
+  for (const e of officialEntries) {
+    if (e.jan && !byJan.has(e.jan)) byJan.set(e.jan, e);
+    if (!byTheme.has(e.theme)) byTheme.set(e.theme, e);
+  }
+  const hasRecord = i =>
+    i.owned || i.photo || i.purchaseDate || i.memo || i.price != null || i.store || i.count;
+
+  // 1) 既存項目を公式にひも付け（JAN→テーマ名の順）。公式に無いが記録がある
+  //    項目（独自テーマ等）は保護。非所持で公式にも無いノイズだけ破棄する。
+  const keptJans = new Set();
+  const next = [];
+  for (const i of state.items) {
+    const e = (i.jan && byJan.get(i.jan)) || byTheme.get(i.name.normalize("NFKC"));
+    if (e) {
+      if (e.jan) { i.jan = e.jan; keptJans.add(e.jan); }
+      i.officialUrl = e.url;
+      if (!i.series && e.category) i.category = e.category; // 通常版は公式カテゴリを採用
+      next.push(i);
+    } else if (hasRecord(i)) {
+      next.push(i);
+    }
+  }
+
+  // 2) 公式にあって図鑑に無いテーマを追加（全ラインナップを網羅）
+  const haveThemes = new Set(next.map(i => i.name.normalize("NFKC")));
+  let n = 0;
+  for (const e of officialEntries) {
+    if (e.jan && keptJans.has(e.jan)) continue;
+    if (haveThemes.has(e.theme)) continue;
+    next.push({
+      id: "cat_" + (e.jan || Date.now() + "_" + (n++)),
+      jan: e.jan, name: e.theme, series: "",
+      category: e.category || "その他", emoji: "📔", desc: "", releaseDate: e.releaseDate || "",
+      owned: false, count: 0, photo: null, imageUrl: "", officialUrl: e.url, market: null,
+      purchaseDate: "", price: null, store: "", memo: "",
+    });
+    haveThemes.add(e.theme);
+  }
+
+  state.items = dedupeItems(next);
+  state.settings.officialSourceOfTruth = true;
+  state.settings.officialMasterVersion = OFFICIAL_MASTER_VERSION;
+  return true;
+}
+
+function integrateOfficialCatalog(products) {
+  const { isNew, entries } = normalizeCatalog(products);
+  officialCatalog = products;
+  officialEntries = entries;
+  officialIsNew = isNew;
+  const changed = migrateToOfficialMaster();
+  applyOfficialImages();
+  if (changed) save();
+  render();
+}
+
+// 「公式から検索」「公式情報を正として再構築」等は、ページ読み込み直後の
 // フェッチ完了前にボタンが押されてもカタログが空扱いにならないよう、このPromiseを待つ。
-const officialCatalogReady = fetch("official_catalog.json")
-  .then(r => (r.ok ? r.json() : null))
-  .then(data => {
-    if (!data || !Array.isArray(data.products)) return;
-    officialCatalog = data.products;
-    applyOfficialImages();
-    render();
-  })
-  .catch(() => { /* file://やカタログ未生成時は図鑑風カバーで表示 */ });
+const officialCatalogReady = (async () => {
+  for (const src of [CATALOG_ENDPOINT, "official_catalog.json"]) {
+    try {
+      const r = await fetch(src, { cache: "no-cache" });
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (data && Array.isArray(data.products) && data.products.length) {
+        integrateOfficialCatalog(data.products);
+        return;
+      }
+    } catch (e) { /* 次のソースへフォールバック */ }
+  }
+})();
 
 /* ============================================================
  * 描画
@@ -847,7 +972,7 @@ function renderStats() {
 
 function renderCatProgress() {
   const el = document.getElementById("catProgress");
-  el.innerHTML = CATEGORIES.map(cat => {
+  el.innerHTML = allCategories().map(cat => {
     const items = state.items.filter(i => i.category === cat);
     if (!items.length) return "";
     const owned = items.filter(i => i.owned).length;
@@ -863,7 +988,7 @@ function renderCatProgress() {
 
 function renderChips() {
   const el = document.getElementById("catChips");
-  const cats = ["all", ...CATEGORIES.filter(c => state.items.some(i => i.category === c))];
+  const cats = ["all", ...allCategories().filter(c => state.items.some(i => i.category === c))];
   el.innerHTML = cats.map(c =>
     `<button class="chip ${filter.cat === c ? "active" : ""}" data-cat="${esc(c)}">
        ${c === "all" ? "すべて" : esc(c)}
@@ -940,7 +1065,7 @@ function openDetail(id) {
   document.getElementById("btnDelete").style.display = id ? "" : "none";
 
   const catSel = document.getElementById("fCategory");
-  catSel.innerHTML = CATEGORIES.map(c =>
+  catSel.innerHTML = allCategories().map(c =>
     `<option value="${esc(c)}" ${i && i.category === c ? "selected" : ""}>${esc(c)}</option>`).join("");
 
   // 購入店の入力候補（過去に入力した店名）
@@ -1311,13 +1436,12 @@ async function discoverFromOfficial() {
   }
   discovered = [];
   const seen = new Set();
-  for (const c of officialCatalog) {
-    const p = parseThemeFromItemName(c.name);
-    if (!p) continue;
-    const key = p.series + "|" + p.theme;
-    if (seen.has(key) || themeExists(p.theme, p.series)) continue;
+  for (const e of officialEntries) {
+    const key = e.series + "|" + e.theme;
+    if (seen.has(key) || themeExists(e.theme, e.series)) continue;
     seen.add(key);
-    discovered.push({ ...p, price: null, shop: "カミオジャパン公式", url: c.url, image: c.image });
+    discovered.push({ theme: e.theme, series: e.series, price: null,
+      shop: "カミオジャパン公式", url: e.url, image: e.image, category: e.category, jan: e.jan });
   }
   if (!discovered.length) {
     status.textContent = "公式ショップの一覧と比べて、未収録のテーマはありませんでした。";
@@ -1340,18 +1464,22 @@ function addDiscovered() {
   if (!chosen.length) { document.getElementById("discoverStatus").textContent = "追加するテーマをタップで選択してください。"; return; }
   const today = new Date().toISOString().slice(0, 10);
   chosen.forEach((d, n) => {
+    const isOfficial = d.shop === "カミオジャパン公式";
     state.items.push({
-      id: "user_" + Date.now() + "_" + n,
-      name: d.theme, series: d.series, category: "その他", emoji: "📔", desc: "",
-      owned: false, count: 0, photo: null, imageUrl: d.image,
-      officialUrl: d.shop === "カミオジャパン公式" ? d.url : "",
+      id: (isOfficial && d.jan ? "cat_" + d.jan : "user_" + Date.now() + "_" + n),
+      jan: d.jan || "", name: d.theme, series: d.series,
+      category: d.category || "その他", emoji: "📔", desc: "",
+      owned: false, count: 0, photo: null, imageUrl: isOfficial ? "" : d.image,
+      officialUrl: isOfficial ? d.url : "",
       market: d.price ? { price: d.price, shop: d.shop, url: d.url, fetchedAt: today } : null,
       purchaseDate: "", price: null, store: "", memo: "",
     });
   });
-  save(); render();
+  save();
+  if (officialEntries.length) applyOfficialImages();
+  render();
   document.getElementById("discoverStatus").textContent =
-    `${chosen.length}件を追加しました（カテゴリは「その他」になっています。詳細画面で変更できます）。`;
+    `${chosen.length}件を追加しました（カテゴリは公式カタログの分類を反映しています。詳細画面で変更できます）。`;
   document.getElementById("discoverResults").innerHTML = "";
   document.getElementById("btnAddDiscovered").style.display = "none";
 }
@@ -1379,35 +1507,92 @@ function guessCategory(theme) {
 
 async function rebuildFromOfficial() {
   const status = document.getElementById("rebuildStatus");
-  if (!officialCatalog.length) {
+  if (!officialEntries.length) {
     status.textContent = "公式カタログを読み込み中…";
     await officialCatalogReady;
   }
-  if (!officialCatalog.length) {
+  if (!officialEntries.length) {
     status.textContent = "公式カタログがまだ取得できませんでした（公開ページで開いているか確認してください）。";
     return;
   }
   if (!confirm(
     "楽天などから取得した画像・参考価格、および自分で登録した写真をすべてクリアし、\n" +
-    "公式ショップの画像・ラインナップを正として図鑑を再構築します。\n" +
+    "公式カタログの画像・ラインナップを正として図鑑を再構築します。\n" +
     "所持記録・購入情報・メモは保持されます。よろしいですか？")) return;
 
-  // 公式ラインナップのテーマ一覧（テーマ名＋シリーズ）。公式ショップは
+  // 新形式（公式サイト kamiojapan.jp/catalog）が取得できているときは、JANを
+  // 一意キーに全ラインナップを正として作り直す。カテゴリ・画像も公式に準拠する。
+  if (officialIsNew) {
+    const byJan = new Map(), byTheme = new Map();
+    for (const e of officialEntries) {
+      if (e.jan && !byJan.has(e.jan)) byJan.set(e.jan, e);
+      if (!byTheme.has(e.theme)) byTheme.set(e.theme, e);
+    }
+    const hasRecord = i =>
+      i.owned || i.photo || i.purchaseDate || i.memo || i.price != null || i.store || i.count;
+    const before = state.items.length;
+    const orphans = [];
+    const keptJans = new Set();
+    const next = [];
+    for (const i of state.items) {
+      const e = (i.jan && byJan.get(i.jan)) || byTheme.get(i.name.normalize("NFKC"));
+      if (e) {
+        if (e.jan) { i.jan = e.jan; keptJans.add(e.jan); }
+        i.officialUrl = e.url;
+        if (!i.series && e.category) i.category = e.category;
+        next.push(i);
+      } else if (hasRecord(i)) {
+        orphans.push(i.name + (i.series ? "（" + i.series + "）" : ""));
+        next.push(i);
+      }
+    }
+    const removed = before - next.length;
+    let cleared = 0;
+    for (const i of next) {
+      if (i.imageUrl || i.market || i.photo) cleared++;
+      i.imageUrl = ""; i.market = null; i.photo = null;
+    }
+    const haveThemes = new Set(next.map(i => i.name.normalize("NFKC")));
+    let added = 0;
+    for (const e of officialEntries) {
+      if (e.jan && keptJans.has(e.jan)) continue;
+      if (haveThemes.has(e.theme)) continue;
+      next.push({
+        id: "cat_" + (e.jan || Date.now() + "_" + added), jan: e.jan, name: e.theme, series: "",
+        category: e.category || "その他", emoji: "📔", desc: "", releaseDate: e.releaseDate || "",
+        owned: false, count: 0, photo: null, imageUrl: "", officialUrl: e.url, market: null,
+        purchaseDate: "", price: null, store: "", memo: "",
+      });
+      haveThemes.add(e.theme); added++;
+    }
+    state.items = dedupeItems(next);
+    state.settings.officialSourceOfTruth = true;
+    state.settings.officialMasterVersion = OFFICIAL_MASTER_VERSION;
+    applyOfficialImages();
+    save();
+    render();
+    const orphanNote = orphans.length
+      ? ` ⚠ 公式カタログに無いが所持記録があるため保持: ${orphans.slice(0, 8).join("、")}${orphans.length > 8 ? " ほか" + (orphans.length - 8) + "件" : ""}（テーマ名を公式表記に手直しすると統合できます）`
+      : "";
+    status.textContent =
+      `公式カタログ（${officialEntries.length}件）を正として再構築しました: クリア${cleared}件・削除${removed}件・追加${added}件・合計${state.items.length}件。画像・カテゴリは公式カタログに準じます。` + orphanNote;
+    return;
+  }
+
+  // ── 旧形式（公式ショップ kamiojapan.shop）フォールバック ──
   // Premium版・3D版・ミニ版を「1商品ページでテーマを選ぶ」形式で販売しており、
   // 一覧からはテーマ別の商品名・画像を取得できない（常に series="" になる）。
   // そのため officialThemesAny には「シリーズを問わずテーマ名だけ」も別途集め、
   // Premium/3D/ミニのアイテムが「公式に存在しない」と誤判定されないようにする。
   const officialKeys = new Set();
   const officialThemesAny = new Set();
-  const officialEntries = [];
-  for (const c of officialCatalog) {
-    const p = parseThemeFromItemName(c.name);
-    if (!p) continue;
-    const key = p.series + "|" + p.theme;
-    officialThemesAny.add(p.theme);
+  const oldEntries = [];
+  for (const e of officialEntries) {
+    const key = e.series + "|" + e.theme;
+    officialThemesAny.add(e.theme);
     if (officialKeys.has(key)) continue;
     officialKeys.add(key);
-    officialEntries.push({ ...p, url: c.url, image: c.image });
+    oldEntries.push({ theme: e.theme, series: e.series, url: e.url, image: e.image });
   }
 
   // 1) 公式カタログを正にする: 公式に存在せず、所持記録等も無い項目は
@@ -1442,7 +1627,7 @@ async function rebuildFromOfficial() {
 
   // 3) 公式にあって図鑑に無いテーマを追加
   let added = 0;
-  for (const e of officialEntries) {
+  for (const e of oldEntries) {
     if (themeExists(e.theme, e.series)) continue;
     state.items.push({
       id: "user_" + Date.now() + "_" + (added++),
@@ -1485,7 +1670,7 @@ async function rebuildFromOfficial() {
   const mergedNote = merged ? `・重複統合${merged}件（過去の再構築で残った重複を1件にまとめました）` : "";
   const restoredNote = restored ? `・Premium/3D/ミニ版${restored}件を復元` : "";
   status.textContent =
-    `再構築しました: 取得情報のクリア${cleared}件・削除${removed}件・公式ラインナップから追加${added}件${restoredNote}${mergedNote}・合計${state.items.length}件（公式${officialEntries.length}件）。` +
+    `再構築しました: 取得情報のクリア${cleared}件・削除${removed}件・公式ラインナップから追加${added}件${restoredNote}${mergedNote}・合計${state.items.length}件（公式${oldEntries.length}件）。` +
     "画像はすべて公式ショップのものが表示されます。" + orphanNote;
 }
 
